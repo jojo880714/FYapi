@@ -24,6 +24,21 @@ app.get('/', (req, res) => {
   res.send('Server is running!');
 });
 
+// 處理來自 Meta 的 POST 請求（真正的通知內容）
+app.use(express.json()); // 讓伺服器看得懂 JSON 資料
+
+app.post('/webhook', (req, res) => {
+  const body = req.body;
+
+  if (body.topic) {
+    // 這行會在 Render 的 Logs 裡印出整串 Threads 的資料內容
+    console.log('收到 Threads 通知:', JSON.stringify(body, null, 2));
+    res.status(200).send('EVENT_RECEIVED');
+  } else {
+    res.sendStatus(404);
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server is listening on port ${port}`);
 });
