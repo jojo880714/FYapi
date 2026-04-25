@@ -404,7 +404,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function initApp() {
     // 如果沒有 URL，先詢問用戶
     if (!CONFIG.API_URL) {
-        const url = prompt("偵測到尚未設定 API！\n請輸入您的 GAS Web App URL (包含 /exec):");
+        const url = prompt("https://script.google.com/macros/s/AKfycbwDF3W05aNdWhFJFM-nhdNXrKYoN8eNeDXJcrvVi7s3FIl66cg250yvtU-laqT8HGvR/exec");
         if (url) {
             localStorage.setItem('threads_gas_url', url);
             CONFIG.API_URL = url;
