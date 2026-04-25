@@ -373,79 +373,102 @@
     </div>
     
     <script>
-        // ═══════════════════════════════════════════════════════
-        // 🔧 設定區（請修改此處的 API URL）
-        // ═══════════════════════════════════════════════════════
-        
-        const CONFIG = {
-            // 🚨 重要：請替換成你的 GAS Web App URL
-            API_URL: 'https://script.google.com/macros/s/AKfycbw2fSUSQ1kUspY8X50eTga96UorNluZ2b5WWuHtIX9pJn79x5Lzn9jMN0-rcAcpF4Oz/exec',
-            
-            // API Endpoints
-            ENDPOINTS: {
-                getPosts: '?action=getPosts',
-                getStats: '?action=getStats',
-                getTop3: '?action=getTop3',
-                getAccounts: '?action=getAccounts',
-                getTopics: '?action=getTopics',
-                createPost: '', // POST request
-                createReply: '' // POST request
-            }
-        };
-        
-        // ═══════════════════════════════════════════════════════
-        // 全域變數
-        // ═══════════════════════════════════════════════════════
-        
-        let allPosts = [];
-        let filteredPosts = [];
-        let charts = {};
-        
-        // ═══════════════════════════════════════════════════════
-        // 初始化
-        // ═══════════════════════════════════════════════════════
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            initApp();
-        });
-        
-        async function initApp() {
-            showLoading();
-            
-            try {
-                await loadAccounts();
-                await loadTopics();
-                await loadData();
-                
-                hideLoading();
-            } catch (error) {
-                console.error('初始化失敗:', error);
-                alert('初始化失敗，請檢查 API 設定');
-                hideLoading();
-            }
+// ═══════════════════════════════════════════════════════
+// 🔧 設定區（使用方案三：LocalStorage 儲存 URL）
+// ═══════════════════════════════════════════════════════
+
+const CONFIG = {
+    API_URL: localStorage.getItem('threads_gas_url') || '',
+    ENDPOINTS: {
+        getPosts: '?action=getPosts',
+        getStats: '?action=getStats',
+        getTop3: '?action=getTop3',
+        getAccounts: '?action=getAccounts',
+        getTopics: '?action=getTopics',
+        createPost: '?action=createPost'
+    }
+};
+
+let allPosts = [];
+let filteredPosts = [];
+let charts = {};
+
+// ═══════════════════════════════════════════════════════
+// 初始化
+// ═══════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', function() {
+    initApp();
+});
+
+async function initApp() {
+    // 如果沒有 URL，先詢問用戶
+    if (!CONFIG.API_URL) {
+        const url = prompt("偵測到尚未設定 API！\n請輸入您的 GAS Web App URL (包含 /exec):");
+        if (url) {
+            localStorage.setItem('threads_gas_url', url);
+            CONFIG.API_URL = url;
+        } else {
+            alert("未設定 API，網頁將無法運作。");
+            return;
         }
+    }
+
+    showLoading();
+    
+    try {
+        // 全面改用 fetch 調用
+        const [accounts, topics, data] = await Promise.all([
+            fetchAPI(CONFIG.ENDPOINTS.getAccounts),
+            fetchAPI(CONFIG.ENDPOINTS.getTopics),
+            fetchAPI(CONFIG.ENDPOINTS.getPosts)
+        ]);
+
+        setupDropdowns('filterAccount', accounts);
+        setupDropdowns('publishAccount', accounts);
+        setupDropdowns('filterTopic', topics);
         
-        // ═══════════════════════════════════════════════════════
-        // API 呼叫
-        // ═══════════════════════════════════════════════════════
-        
-        async function callAPI(endpoint, method = 'GET', data = null) {
-            const url = CONFIG.API_URL + endpoint;
-            
-            const options = {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            };
-            
-            if (data && method === 'POST') {
-                options.body = JSON.stringify(data);
-            }
-            
-            const response = await fetch(url, options);
-            return await response.json();
-        }
+        handlePostsData(data);
+        hideLoading();
+    } catch (error) {
+        console.error('初始化失敗:', error);
+        alert('連線至 GAS 失敗，請確認 API URL 是否正確且已發布為「任何人」。');
+        hideLoading();
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// 核心：取代 google.script.run 的 fetch 函式
+// ═══════════════════════════════════════════════════════
+
+async function fetchAPI(endpoint, method = 'GET', bodyData = null) {
+    const url = CONFIG.API_URL + endpoint;
+    const options = {
+        method: 'GET', // GAS 處理 CORS 建議優先使用 GET 帶 action 參數
+        mode: 'cors'
+    };
+
+    if (method === 'POST') {
+        // 注意：GAS 的 POST 處理較複雜，若純讀取建議皆用 GET
+        options.method = 'POST';
+        options.body = JSON.stringify(bodyData);
+    }
+
+    const response = await fetch(url, options);
+    if (!response.ok) throw new Error('Network response was not ok');
+    return await response.json();
+}
+
+function setupDropdowns(id, list) {
+    const select = document.getElementById(id);
+    if (!select) return;
+    list.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item;
+        option.textContent = item;
+        select.appendChild(option);
+    });
+}
         
         // ═══════════════════════════════════════════════════════
         // 資料載入
