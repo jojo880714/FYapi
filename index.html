@@ -3,922 +3,781 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧵 Threads 監控儀表板</title>
+    <title>Threads 監控儀表板</title>
     
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Work+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
         :root {
-            --primary: #1a1a1a;
-            --secondary: #2d2d2d;
-            --accent: #ff3366;
-            --accent-soft: #ff6b8a;
-            --bg: #fafafa;
-            --bg-card: #ffffff;
-            --text: #1a1a1a;
-            --text-muted: #666666;
-            --border: #e0e0e0;
-            --success: #00c853;
-            --warning: #ffa726;
-            --shadow: rgba(0, 0, 0, 0.08);
-            --shadow-lg: rgba(0, 0, 0, 0.12);
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --secondary: #764ba2;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --dark: #1f2937;
+            --light: #f9fafb;
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        
         body {
-            font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.6;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
         }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            transition: all 0.3s ease;
         }
-
-        /* Header */
-        .header {
+        
+        .card:hover {
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .stat-card {
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: white;
-            padding: 3rem 0;
-            margin-bottom: 3rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-            opacity: 0.3;
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 2rem;
-            position: relative;
-            z-index: 1;
-        }
-
-        .header h1 {
-            font-family: 'DM Serif Display', serif;
-            font-size: 3rem;
-            font-weight: 400;
-            margin-bottom: 0.5rem;
-            letter-spacing: -0.02em;
-        }
-
-        .header p {
-            font-size: 1.1rem;
-            opacity: 0.9;
-            font-weight: 300;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 1rem;
-            margin-top: 2rem;
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-family: 'Work Sans', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-primary {
-            background: white;
-            color: var(--primary);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        }
-
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            backdrop-filter: blur(10px);
-        }
-
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.25);
-        }
-
-        .btn-accent {
-            background: var(--accent);
-            color: white;
-        }
-
-        .btn-accent:hover {
-            background: var(--accent-soft);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(255, 51, 102, 0.3);
-        }
-
-        /* Filters */
-        .filters {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 12px var(--shadow);
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-        }
-
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .filter-group label {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .filter-group select {
-            padding: 0.75rem 1rem;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-family: 'Work Sans', sans-serif;
-            font-size: 0.95rem;
-            background: white;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .filter-group select:focus {
-            outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(255, 51, 102, 0.1);
-        }
-
-        /* Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 2px 12px var(--shadow);
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 24px var(--shadow-lg);
-        }
-
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 4px;
-            height: 100%;
-            background: var(--accent);
-            transform: scaleY(0);
-            transition: transform 0.3s ease;
-        }
-
-        .stat-card:hover::before {
-            transform: scaleY(1);
-        }
-
-        .stat-icon {
-            font-size: 2rem;
-            margin-bottom: 1rem;
-        }
-
-        .stat-value {
-            font-family: 'DM Serif Display', serif;
-            font-size: 2.5rem;
-            font-weight: 400;
-            color: var(--primary);
-            margin-bottom: 0.25rem;
-            line-height: 1;
-        }
-
-        .stat-label {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-
-        .stat-change {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-            margin-top: 0.5rem;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        .stat-change.positive {
-            background: rgba(0, 200, 83, 0.1);
-            color: var(--success);
-        }
-
-        .stat-change.negative {
-            background: rgba(255, 51, 102, 0.1);
-            color: var(--accent);
-        }
-
-        /* Charts Section */
-        .charts-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        @media (max-width: 968px) {
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .chart-card {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 2px 12px var(--shadow);
-        }
-
-        .chart-card h3 {
-            font-family: 'DM Serif Display', serif;
-            font-size: 1.5rem;
-            font-weight: 400;
-            margin-bottom: 1.5rem;
-            color: var(--primary);
-        }
-
-        /* Top Posts */
-        .top-posts {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 2px 12px var(--shadow);
-            margin-bottom: 2rem;
-        }
-
-        .top-posts-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .top-posts h3 {
-            font-family: 'DM Serif Display', serif;
-            font-size: 1.5rem;
-            font-weight: 400;
-        }
-
-        .top-posts-sort {
-            padding: 0.5rem 1rem;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-family: 'Work Sans', sans-serif;
-            font-size: 0.9rem;
-            background: white;
-            cursor: pointer;
-        }
-
-        .top-post-item {
-            display: flex;
-            gap: 1rem;
             padding: 1.5rem;
             border-radius: 12px;
-            background: var(--bg);
-            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
             transition: all 0.3s ease;
         }
-
-        .top-post-item:hover {
-            background: #f0f0f0;
-            transform: translateX(8px);
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
         }
-
-        .post-rank {
-            font-family: 'DM Serif Display', serif;
-            font-size: 2rem;
-            font-weight: 400;
-            color: var(--accent);
-            min-width: 50px;
-        }
-
-        .post-content {
-            flex: 1;
-        }
-
-        .post-text {
-            font-size: 0.95rem;
-            margin-bottom: 0.5rem;
-            color: var(--text);
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .post-meta {
-            display: flex;
-            gap: 1.5rem;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        .post-meta span {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        /* Posts List */
-        .posts-list {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 2px 12px var(--shadow);
-        }
-
-        .posts-list h3 {
-            font-family: 'DM Serif Display', serif;
-            font-size: 1.5rem;
-            font-weight: 400;
-            margin-bottom: 1.5rem;
-        }
-
-        .post-item {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border);
-            transition: all 0.2s ease;
-        }
-
-        .post-item:hover {
-            background: var(--bg);
-        }
-
-        .post-item:last-child {
-            border-bottom: none;
-        }
-
-        .post-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 0.75rem;
-        }
-
-        .post-date {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-
-        .post-tags {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .tag {
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            background: var(--bg);
-            color: var(--text-muted);
-        }
-
-        .post-stats {
-            display: flex;
-            gap: 1.5rem;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-        }
-
-        .post-stats span {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        .view-detail-btn {
+        
+        .filter-select {
             padding: 0.5rem 1rem;
-            border: 1px solid var(--border);
-            border-radius: 6px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
             background: white;
-            color: var(--text);
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
         }
-
-        .view-detail-btn:hover {
-            border-color: var(--accent);
-            color: var(--accent);
+        
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
-
-        /* Loading State */
+        
         .loading {
-            text-align: center;
-            padding: 3rem;
-            color: var(--text-muted);
-        }
-
-        .spinner {
-            border: 3px solid var(--border);
-            border-top-color: var(--accent);
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
         }
-
+        
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 2rem;
-            }
-
-            .header-actions {
-                flex-direction: column;
-            }
-
-            .filters {
-                grid-template-columns: 1fr;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
+        
+        .post-item {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
+            cursor: pointer;
         }
-
-        /* Modal */
+        
+        .post-item:hover {
+            background: #f9fafb;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .badge-primary { background: #dbeafe; color: #1e40af; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        
         .modal {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
-            right: 0;
-            bottom: 0;
+            width: 100%;
+            height: 100%;
             background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(5px);
             z-index: 1000;
-            align-items: center;
             justify-content: center;
+            align-items: center;
         }
-
+        
         .modal.active {
             display: flex;
         }
-
+        
         .modal-content {
             background: white;
-            border-radius: 16px;
+            border-radius: 12px;
             padding: 2rem;
             max-width: 600px;
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .modal-header h2 {
-            font-family: 'DM Serif Display', serif;
-            font-size: 1.8rem;
-            font-weight: 400;
-        }
-
-        .close-btn {
-            font-size: 1.5rem;
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: var(--text-muted);
-            padding: 0;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: all 0.2s ease;
-        }
-
-        .close-btn:hover {
-            background: var(--bg);
-            color: var(--text);
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--text);
-            margin-bottom: 0.5rem;
-        }
-
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-family: 'Work Sans', sans-serif;
-            font-size: 0.95rem;
-            transition: all 0.2s ease;
-        }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 120px;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(255, 51, 102, 0.1);
         }
     </style>
 </head>
 <body>
-    <!-- Header -->
-    <div class="header">
-        <div class="header-content">
-            <h1>🧵 Threads 監控儀表板</h1>
-            <p>追蹤你的 Threads 內容表現與受眾洞察</p>
-            <div class="header-actions">
-                <button class="btn btn-primary" onclick="refreshData()">
-                    🔄 更新數據
-                </button>
-                <button class="btn btn-secondary" onclick="openPostModal()">
-                    ➕ 發布貼文
-                </button>
-                <button class="btn btn-secondary" onclick="fetchAudienceInsights()">
-                    👥 受眾洞察
-                </button>
+    <!-- 主容器 -->
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        
+        <!-- 頂部導航 -->
+        <div class="card mb-8 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">
+                        <i class="fas fa-chart-line" style="color: var(--primary);"></i>
+                        Threads 監控儀表板
+                    </h1>
+                    <p class="text-gray-600 mt-2">即時追蹤社群表現，優化內容策略</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="refreshData()" class="btn-primary">
+                        <i class="fas fa-sync-alt mr-2"></i>
+                        <span id="refreshBtn">更新數據</span>
+                    </button>
+                    <button onclick="openPublishModal()" class="btn-primary">
+                        <i class="fas fa-plus mr-2"></i>
+                        發布貼文
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 篩選器 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                <select id="filterAccount" class="filter-select" onchange="applyFilters()">
+                    <option value="">全部帳號</option>
+                </select>
+                
+                <select id="filterTopic" class="filter-select" onchange="applyFilters()">
+                    <option value="">全部主題</option>
+                </select>
+                
+                <select id="filterRegion" class="filter-select" onchange="applyFilters()">
+                    <option value="">全部地區</option>
+                </select>
+                
+                <select id="filterMonth" class="filter-select" onchange="applyFilters()">
+                    <option value="">全部月份</option>
+                    <option value="1">1月</option>
+                    <option value="2">2月</option>
+                    <option value="3">3月</option>
+                    <option value="4">4月</option>
+                    <option value="5">5月</option>
+                    <option value="6">6月</option>
+                    <option value="7">7月</option>
+                    <option value="8">8月</option>
+                    <option value="9">9月</option>
+                    <option value="10">10月</option>
+                    <option value="11">11月</option>
+                    <option value="12">12月</option>
+                </select>
             </div>
         </div>
-    </div>
-
-    <div class="container">
-        <!-- Filters -->
-        <div class="filters">
-            <div class="filter-group">
-                <label>帳號</label>
-                <select id="accountFilter" onchange="applyFilters()">
-                    <option value="all">所有帳號</option>
-                </select>
+        
+        <!-- 統計卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">總貼文數</p>
+                        <h3 class="text-3xl font-bold mt-2" id="statTotalPosts">0</h3>
+                    </div>
+                    <i class="fas fa-file-alt text-4xl opacity-50"></i>
+                </div>
             </div>
-            <div class="filter-group">
-                <label>主題</label>
-                <select id="topicFilter" onchange="applyFilters()">
-                    <option value="all">所有主題</option>
-                </select>
+            
+            <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">總瀏覽數</p>
+                        <h3 class="text-3xl font-bold mt-2" id="statTotalViews">0</h3>
+                    </div>
+                    <i class="fas fa-eye text-4xl opacity-50"></i>
+                </div>
             </div>
-            <div class="filter-group">
-                <label>地區</label>
-                <select id="regionFilter" onchange="applyFilters()">
-                    <option value="all">所有地區</option>
-                </select>
+            
+            <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">平均瀏覽</p>
+                        <h3 class="text-3xl font-bold mt-2" id="statAvgViews">0</h3>
+                    </div>
+                    <i class="fas fa-chart-bar text-4xl opacity-50"></i>
+                </div>
             </div>
-            <div class="filter-group">
-                <label>月份</label>
-                <select id="monthFilter" onchange="applyFilters()">
-                    <option value="all">所有月份</option>
-                </select>
+            
+            <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">互動率</p>
+                        <h3 class="text-3xl font-bold mt-2" id="statEngagementRate">0%</h3>
+                    </div>
+                    <i class="fas fa-heart text-4xl opacity-50"></i>
+                </div>
             </div>
         </div>
-
-        <!-- Stats Cards -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon">📊</div>
-                <div class="stat-value" id="totalPosts">0</div>
-                <div class="stat-label">總貼文數</div>
-                <div class="stat-change positive">+12% 較上月</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">👁️</div>
-                <div class="stat-value" id="totalViews">0</div>
-                <div class="stat-label">總瀏覽數</div>
-                <div class="stat-change positive">+18% 較上月</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">💫</div>
-                <div class="stat-value" id="avgViews">0</div>
-                <div class="stat-label">平均瀏覽數</div>
-                <div class="stat-change positive">+5% 較上月</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">❤️</div>
-                <div class="stat-value" id="engagementRate">0%</div>
-                <div class="stat-label">互動率</div>
-                <div class="stat-change positive">+3% 較上月</div>
-            </div>
-        </div>
-
-        <!-- Charts -->
-        <div class="charts-grid">
-            <div class="chart-card">
-                <h3>📈 發文趨勢（近7天）</h3>
+        
+        <!-- 圖表區 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="card p-6">
+                <h3 class="text-xl font-bold mb-4 text-gray-800">
+                    <i class="fas fa-chart-line mr-2" style="color: var(--primary);"></i>
+                    發文趨勢（7天）
+                </h3>
                 <canvas id="trendChart"></canvas>
             </div>
-            <div class="chart-card">
-                <h3>🎯 主題分布</h3>
+            
+            <div class="card p-6">
+                <h3 class="text-xl font-bold mb-4 text-gray-800">
+                    <i class="fas fa-chart-pie mr-2" style="color: var(--primary);"></i>
+                    主題分布
+                </h3>
                 <canvas id="topicChart"></canvas>
             </div>
         </div>
-
-        <!-- Top 3 Posts -->
-        <div class="top-posts">
-            <div class="top-posts-header">
-                <h3>🏆 本月 Top 3 貼文</h3>
-                <select class="top-posts-sort" onchange="sortTop3(this.value)">
+        
+        <!-- Top 3 貼文 -->
+        <div class="card p-6 mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800">
+                    <i class="fas fa-trophy mr-2" style="color: #fbbf24;"></i>
+                    本月 Top 3 貼文
+                </h3>
+                <select id="top3Metric" class="filter-select" onchange="loadTop3Posts()">
                     <option value="views">依瀏覽數</option>
                     <option value="engagement">依互動數</option>
                 </select>
             </div>
-            <div id="topPostsList">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>載入中...</p>
-                </div>
-            </div>
+            <div id="top3Container" class="space-y-4"></div>
         </div>
-
-        <!-- Posts List -->
-        <div class="posts-list">
-            <h3>📝 貼文列表</h3>
-            <div id="postsList">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>載入貼文資料...</p>
-                </div>
-            </div>
+        
+        <!-- 貼文列表 -->
+        <div class="card p-6">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">
+                <i class="fas fa-list mr-2" style="color: var(--primary);"></i>
+                貼文列表
+                <span class="text-sm font-normal text-gray-500 ml-2" id="postCount">(0 篇)</span>
+            </h3>
+            <div id="postsContainer"></div>
         </div>
+        
     </div>
-
-    <!-- Post Modal -->
-    <div class="modal" id="postModal">
+    
+    <!-- 發布貼文 Modal -->
+    <div id="publishModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2>發布新貼文</h2>
-                <button class="close-btn" onclick="closeModal('postModal')">✕</button>
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-edit mr-2" style="color: var(--primary);"></i>
+                    發布新貼文
+                </h3>
+                <button onclick="closePublishModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
             </div>
+            
             <form onsubmit="submitPost(event)">
-                <div class="form-group">
-                    <label>貼文內容</label>
-                    <textarea id="postContent" placeholder="輸入你的貼文內容..." required></textarea>
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">帳號</label>
+                    <select id="publishAccount" class="filter-select w-full" required>
+                        <option value="">選擇帳號</option>
+                    </select>
                 </div>
-                <div class="form-group">
-                    <label>主題標籤</label>
-                    <input type="text" id="postTopic" placeholder="例如：遊學、留學" required>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">貼文內容</label>
+                    <textarea id="publishContent" rows="6" class="filter-select w-full" 
+                              placeholder="輸入貼文內容..." required></textarea>
                 </div>
-                <div class="form-group">
-                    <label>地區</label>
-                    <input type="text" id="postRegion" placeholder="例如：英國、澳洲">
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">圖片網址（選填）</label>
+                    <input type="url" id="publishImage" class="filter-select w-full" 
+                           placeholder="https://example.com/image.jpg">
                 </div>
-                <div class="form-group">
-                    <label>CTA 連結（選填）</label>
-                    <input type="url" id="postCTA" placeholder="https://example.com">
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">主題（選填）</label>
+                        <input type="text" id="publishTopic" class="filter-select w-full" 
+                               placeholder="例：遊學">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">地區（選填）</label>
+                        <input type="text" id="publishRegion" class="filter-select w-full" 
+                               placeholder="例：英國">
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-accent" style="width: 100%;">發布貼文</button>
+                
+                <div class="flex gap-3">
+                    <button type="submit" class="btn-primary flex-1">
+                        <i class="fas fa-paper-plane mr-2"></i>
+                        發布
+                    </button>
+                    <button type="button" onclick="closePublishModal()" 
+                            class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300">
+                        取消
+                    </button>
+                </div>
             </form>
         </div>
     </div>
-
-    <script src="config.js"></script>
+    
+    <!-- 貼文詳情 Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-info-circle mr-2" style="color: var(--primary);"></i>
+                    貼文詳情
+                </h3>
+                <button onclick="closeDetailModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div id="detailContent"></div>
+        </div>
+    </div>
+    
     <script>
+        // ═══════════════════════════════════════════════════════
+        // 🔧 設定區（請修改此處的 API URL）
+        // ═══════════════════════════════════════════════════════
+        
+        const CONFIG = {
+            // 🚨 重要：請替換成你的 GAS Web App URL
+            API_URL: 'https://script.google.com/macros/s/AKfycbw2fSUSQ1kUspY8X50eTga96UorNluZ2b5WWuHtIX9pJn79x5Lzn9jMN0-rcAcpF4Oz/exec',
+            
+            // API Endpoints
+            ENDPOINTS: {
+                getPosts: '?action=getPosts',
+                getStats: '?action=getStats',
+                getTop3: '?action=getTop3',
+                getAccounts: '?action=getAccounts',
+                getTopics: '?action=getTopics',
+                createPost: '', // POST request
+                createReply: '' // POST request
+            }
+        };
+        
+        // ═══════════════════════════════════════════════════════
+        // 全域變數
+        // ═══════════════════════════════════════════════════════
+        
         let allPosts = [];
         let filteredPosts = [];
-        let trendChart, topicChart;
-
-        // Initialize on page load
-        window.addEventListener('DOMContentLoaded', () => {
-            refreshData();
+        let charts = {};
+        
+        // ═══════════════════════════════════════════════════════
+        // 初始化
+        // ═══════════════════════════════════════════════════════
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initApp();
         });
-
-        // Refresh data from API
-        async function refreshData() {
+        
+        async function initApp() {
+            showLoading();
+            
             try {
-                const response = await fetch(`${CONFIG.API_URL}?action=getPostsData`);
-                const data = await response.json();
+                await loadAccounts();
+                await loadTopics();
+                await loadData();
                 
-                if (data.status === 'success') {
-                    allPosts = data.posts;
-                    filteredPosts = allPosts;
-                    
-                    updateStats();
-                    updateFilters();
-                    updateCharts();
-                    updatePostsList();
-                    fetchTop3Posts();
-                }
+                hideLoading();
             } catch (error) {
-                console.error('Error fetching data:', error);
-                alert('無法載入數據，請檢查 API 連線');
+                console.error('初始化失敗:', error);
+                alert('初始化失敗，請檢查 API 設定');
+                hideLoading();
             }
         }
-
-        // Update statistics
+        
+        // ═══════════════════════════════════════════════════════
+        // API 呼叫
+        // ═══════════════════════════════════════════════════════
+        
+        async function callAPI(endpoint, method = 'GET', data = null) {
+            const url = CONFIG.API_URL + endpoint;
+            
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+            
+            if (data && method === 'POST') {
+                options.body = JSON.stringify(data);
+            }
+            
+            const response = await fetch(url, options);
+            return await response.json();
+        }
+        
+        // ═══════════════════════════════════════════════════════
+        // 資料載入
+        // ═══════════════════════════════════════════════════════
+        
+        async function loadData() {
+            try {
+                // 使用 google.script.run 呼叫 GAS 函式
+                google.script.run
+                    .withSuccessHandler(handlePostsData)
+                    .withFailureHandler(handleError)
+                    .getPostsData();
+                    
+            } catch (error) {
+                console.error('載入資料失敗:', error);
+            }
+        }
+        
+        function handlePostsData(data) {
+            allPosts = data.posts || [];
+            filteredPosts = allPosts;
+            
+            updateStats();
+            renderPosts();
+            renderCharts();
+            loadTop3Posts();
+        }
+        
+        function handleError(error) {
+            console.error('API 錯誤:', error);
+            alert('資料載入失敗');
+        }
+        
+        async function loadAccounts() {
+            google.script.run
+                .withSuccessHandler(function(accounts) {
+                    const select = document.getElementById('filterAccount');
+                    const publishSelect = document.getElementById('publishAccount');
+                    
+                    accounts.forEach(account => {
+                        const option = `<option value="${account}">${account}</option>`;
+                        select.innerHTML += option;
+                        publishSelect.innerHTML += option;
+                    });
+                })
+                .getAccountList();
+        }
+        
+        async function loadTopics() {
+            google.script.run
+                .withSuccessHandler(function(topics) {
+                    const select = document.getElementById('filterTopic');
+                    
+                    topics.forEach(topic => {
+                        select.innerHTML += `<option value="${topic}">${topic}</option>`;
+                    });
+                })
+                .getTopicList();
+        }
+        
+        async function loadTop3Posts() {
+            const account = document.getElementById('filterAccount').value;
+            const month = document.getElementById('filterMonth').value;
+            const metric = document.getElementById('top3Metric').value;
+            
+            google.script.run
+                .withSuccessHandler(function(top3) {
+                    renderTop3(top3);
+                })
+                .getTop3Posts({
+                    account: account || null,
+                    month: month ? parseInt(month) : null,
+                    metric: metric
+                });
+        }
+        
+        // ═══════════════════════════════════════════════════════
+        // 篩選功能
+        // ═══════════════════════════════════════════════════════
+        
+        function applyFilters() {
+            const account = document.getElementById('filterAccount').value;
+            const topic = document.getElementById('filterTopic').value;
+            const region = document.getElementById('filterRegion').value;
+            const month = document.getElementById('filterMonth').value;
+            
+            filteredPosts = allPosts.filter(post => {
+                if (account && post.account !== account) return false;
+                if (topic && post.topic !== topic) return false;
+                if (region && post.region !== region) return false;
+                
+                if (month) {
+                    const postMonth = new Date(post.timestamp).getMonth() + 1;
+                    if (postMonth !== parseInt(month)) return false;
+                }
+                
+                return true;
+            });
+            
+            updateStats();
+            renderPosts();
+            renderCharts();
+            loadTop3Posts();
+        }
+        
+        // ═══════════════════════════════════════════════════════
+        // 統計數據更新
+        // ═══════════════════════════════════════════════════════
+        
         function updateStats() {
             const totalPosts = filteredPosts.length;
-            const totalViews = filteredPosts.reduce((sum, post) => sum + (post.views || 0), 0);
+            const totalViews = filteredPosts.reduce((sum, p) => sum + (p.views || 0), 0);
+            const totalLikes = filteredPosts.reduce((sum, p) => sum + (p.likes || 0), 0);
+            const totalReplies = filteredPosts.reduce((sum, p) => sum + (p.replies || 0), 0);
+            
             const avgViews = totalPosts > 0 ? Math.round(totalViews / totalPosts) : 0;
+            const engagementRate = totalViews > 0 ? ((totalLikes + totalReplies) / totalViews * 100).toFixed(2) : 0;
             
-            const totalEngagement = filteredPosts.reduce((sum, post) => 
-                sum + (post.likes || 0) + (post.comments || 0) + (post.shares || 0) + (post.saves || 0), 0);
-            const engagementRate = totalViews > 0 ? ((totalEngagement / totalViews) * 100).toFixed(1) : 0;
-
-            document.getElementById('totalPosts').textContent = totalPosts.toLocaleString();
-            document.getElementById('totalViews').textContent = (totalViews / 1000).toFixed(1) + 'K';
-            document.getElementById('avgViews').textContent = avgViews.toLocaleString();
-            document.getElementById('engagementRate').textContent = engagementRate + '%';
+            document.getElementById('statTotalPosts').textContent = totalPosts.toLocaleString();
+            document.getElementById('statTotalViews').textContent = totalViews.toLocaleString();
+            document.getElementById('statAvgViews').textContent = avgViews.toLocaleString();
+            document.getElementById('statEngagementRate').textContent = engagementRate + '%';
         }
-
-        // Update filters
-        function updateFilters() {
-            const accounts = [...new Set(allPosts.map(p => p.account))];
-            const topics = [...new Set(allPosts.map(p => p.topic))];
-            const regions = [...new Set(allPosts.map(p => p.region))];
-            const months = [...new Set(allPosts.map(p => p.date?.substring(0, 7)))];
-
-            updateSelectOptions('accountFilter', accounts);
-            updateSelectOptions('topicFilter', topics);
-            updateSelectOptions('regionFilter', regions);
-            updateSelectOptions('monthFilter', months);
-        }
-
-        function updateSelectOptions(selectId, options) {
-            const select = document.getElementById(selectId);
-            const currentValue = select.value;
+        
+        // ═══════════════════════════════════════════════════════
+        // 貼文列表渲染
+        // ═══════════════════════════════════════════════════════
+        
+        function renderPosts() {
+            const container = document.getElementById('postsContainer');
+            document.getElementById('postCount').textContent = `(${filteredPosts.length} 篇)`;
             
-            select.innerHTML = '<option value="all">所有' + select.previousElementSibling.textContent + '</option>';
-            options.filter(Boolean).forEach(option => {
-                select.innerHTML += `<option value="${option}">${option}</option>`;
-            });
-            
-            if (options.includes(currentValue)) {
-                select.value = currentValue;
+            if (filteredPosts.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-gray-500">
+                        <i class="fas fa-inbox text-6xl mb-4"></i>
+                        <p class="text-xl">沒有符合條件的貼文</p>
+                    </div>
+                `;
+                return;
             }
-        }
-
-        // Apply filters
-        function applyFilters() {
-            const account = document.getElementById('accountFilter').value;
-            const topic = document.getElementById('topicFilter').value;
-            const region = document.getElementById('regionFilter').value;
-            const month = document.getElementById('monthFilter').value;
-
-            filteredPosts = allPosts.filter(post => {
-                return (account === 'all' || post.account === account) &&
-                       (topic === 'all' || post.topic === topic) &&
-                       (region === 'all' || post.region === region) &&
-                       (month === 'all' || post.date?.startsWith(month));
-            });
-
-            updateStats();
-            updateCharts();
-            updatePostsList();
-        }
-
-        // Update charts
-        function updateCharts() {
-            updateTrendChart();
-            updateTopicChart();
-        }
-
-        function updateTrendChart() {
-            const last7Days = getLast7Days();
-            const viewsByDate = {};
             
-            last7Days.forEach(date => viewsByDate[date] = 0);
-            filteredPosts.forEach(post => {
-                if (post.date && viewsByDate.hasOwnProperty(post.date)) {
-                    viewsByDate[post.date] += post.views || 0;
-                }
+            // 依時間排序
+            const sorted = filteredPosts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
+            let html = '';
+            sorted.forEach(post => {
+                const date = new Date(post.timestamp).toLocaleDateString('zh-TW');
+                const content = (post.content || '').substring(0, 100) + '...';
+                
+                html += `
+                    <div class="post-item" onclick="showPostDetail('${post.postId}')">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="badge badge-primary">${post.account}</span>
+                                    ${post.topic ? `<span class="badge badge-success">${post.topic}</span>` : ''}
+                                    ${post.region ? `<span class="badge badge-warning">${post.region}</span>` : ''}
+                                </div>
+                                <p class="text-gray-700 mb-2">${content}</p>
+                                <div class="flex items-center gap-4 text-sm text-gray-500">
+                                    <span><i class="far fa-calendar mr-1"></i>${date}</span>
+                                    <span><i class="far fa-eye mr-1"></i>${(post.views || 0).toLocaleString()}</span>
+                                    <span><i class="far fa-heart mr-1"></i>${(post.likes || 0).toLocaleString()}</span>
+                                    <span><i class="far fa-comment mr-1"></i>${(post.replies || 0).toLocaleString()}</span>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </div>
+                    </div>
+                `;
             });
-
+            
+            container.innerHTML = html;
+        }
+        
+        // ═══════════════════════════════════════════════════════
+        // Top 3 渲染
+        // ═══════════════════════════════════════════════════════
+        
+        function renderTop3(top3Posts) {
+            const container = document.getElementById('top3Container');
+            
+            if (!top3Posts || top3Posts.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-trophy text-4xl mb-2"></i>
+                        <p>本月尚無數據</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            top3Posts.forEach((post, index) => {
+                const medalColors = ['#fbbf24', '#d1d5db', '#cd7f32'];
+                const medal = ['🥇', '🥈', '🥉'][index];
+                
+                html += `
+                    <div class="p-4 rounded-lg border-2" style="border-color: ${medalColors[index]};">
+                        <div class="flex items-start gap-4">
+                            <div class="text-4xl">${medal}</div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="badge badge-primary">${post.account}</span>
+                                    ${post.topic ? `<span class="badge badge-success">${post.topic}</span>` : ''}
+                                </div>
+                                <p class="text-gray-700 mb-3">${post.content}</p>
+                                <div class="flex items-center gap-6 text-sm">
+                                    <span class="font-semibold text-purple-600">
+                                        <i class="far fa-eye mr-1"></i>
+                                        ${(post.views || 0).toLocaleString()}
+                                    </span>
+                                    <span class="text-gray-600">
+                                        <i class="far fa-heart mr-1"></i>
+                                        ${(post.likes || 0).toLocaleString()}
+                                    </span>
+                                    <span class="text-gray-600">
+                                        <i class="far fa-comment mr-1"></i>
+                                        ${(post.replies || 0).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // ═══════════════════════════════════════════════════════
+        // 圖表渲染
+        // ═══════════════════════════════════════════════════════
+        
+        function renderCharts() {
+            renderTrendChart();
+            renderTopicChart();
+        }
+        
+        function renderTrendChart() {
+            // 計算最近 7 天的趨勢
+            const days = [];
+            const viewsData = [];
+            const postsData = [];
+            
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
+                days.push(dateStr);
+                
+                const dayPosts = filteredPosts.filter(p => {
+                    const postDate = new Date(p.timestamp);
+                    return postDate.toDateString() === date.toDateString();
+                });
+                
+                const dayViews = dayPosts.reduce((sum, p) => sum + (p.views || 0), 0);
+                viewsData.push(dayViews);
+                postsData.push(dayPosts.length);
+            }
+            
             const ctx = document.getElementById('trendChart');
-            if (trendChart) trendChart.destroy();
             
-            trendChart = new Chart(ctx, {
+            if (charts.trend) {
+                charts.trend.destroy();
+            }
+            
+            charts.trend = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: last7Days,
+                    labels: days,
                     datasets: [{
                         label: '瀏覽數',
-                        data: Object.values(viewsByDate),
-                        borderColor: '#ff3366',
-                        backgroundColor: 'rgba(255, 51, 102, 0.1)',
-                        tension: 0.4,
-                        fill: true
+                        data: viewsData,
+                        borderColor: 'rgb(102, 126, 234)',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: true,
                     plugins: {
-                        legend: { display: false }
+                        legend: {
+                            display: true,
+                            position: 'bottom'
+                        }
                     },
                     scales: {
-                        y: { beginAtZero: true }
+                        y: {
+                            beginAtZero: true
+                        }
                     }
                 }
             });
         }
-
-        function updateTopicChart() {
-            const topicCounts = {};
-            filteredPosts.forEach(post => {
-                topicCounts[post.topic] = (topicCounts[post.topic] || 0) + 1;
-            });
-
-            const ctx = document.getElementById('topicChart');
-            if (topicChart) topicChart.destroy();
+        
+        function renderTopicChart() {
+            // 統計主題分布
+            const topicMap = {};
             
-            topicChart = new Chart(ctx, {
+            filteredPosts.forEach(post => {
+                const topic = post.topic || '未分類';
+                if (!topicMap[topic]) {
+                    topicMap[topic] = 0;
+                }
+                topicMap[topic]++;
+            });
+            
+            const labels = Object.keys(topicMap);
+            const data = Object.values(topicMap);
+            
+            const ctx = document.getElementById('topicChart');
+            
+            if (charts.topic) {
+                charts.topic.destroy();
+            }
+            
+            charts.topic = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: Object.keys(topicCounts),
+                    labels: labels,
                     datasets: [{
-                        data: Object.values(topicCounts),
+                        data: data,
                         backgroundColor: [
-                            '#ff3366',
-                            '#ff6b8a',
-                            '#ffa726',
-                            '#00c853',
-                            '#2d2d2d'
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(118, 75, 162, 0.8)',
+                            'rgba(255, 99, 132, 0.8)',
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 206, 86, 0.8)',
+                            'rgba(75, 192, 192, 0.8)'
                         ]
                     }]
                 },
@@ -927,161 +786,150 @@
                     maintainAspectRatio: true,
                     plugins: {
                         legend: {
+                            display: true,
                             position: 'bottom'
                         }
                     }
                 }
             });
         }
-
-        // Get last 7 days
-        function getLast7Days() {
-            const dates = [];
-            for (let i = 6; i >= 0; i--) {
-                const date = new Date();
-                date.setDate(date.getDate() - i);
-                dates.push(date.toISOString().split('T')[0]);
-            }
-            return dates;
+        
+        // ═══════════════════════════════════════════════════════
+        // Modal 控制
+        // ═══════════════════════════════════════════════════════
+        
+        function openPublishModal() {
+            document.getElementById('publishModal').classList.add('active');
         }
-
-        // Fetch Top 3 Posts
-        async function fetchTop3Posts() {
-            try {
-                const response = await fetch(`${CONFIG.API_URL}?action=getTop3Posts`);
-                const data = await response.json();
-                
-                if (data.status === 'success') {
-                    renderTop3Posts(data.posts);
-                }
-            } catch (error) {
-                console.error('Error fetching top 3:', error);
-            }
+        
+        function closePublishModal() {
+            document.getElementById('publishModal').classList.remove('active');
+            document.querySelector('#publishModal form').reset();
         }
-
-        function renderTop3Posts(posts) {
-            const container = document.getElementById('topPostsList');
+        
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.remove('active');
+        }
+        
+        function showPostDetail(postId) {
+            const post = allPosts.find(p => p.postId === postId);
+            if (!post) return;
             
-            if (posts.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #666;">暫無貼文資料</p>';
-                return;
-            }
-
-            const medals = ['🥇', '🥈', '🥉'];
-            container.innerHTML = posts.slice(0, 3).map((post, index) => `
-                <div class="top-post-item">
-                    <div class="post-rank">${medals[index]}</div>
-                    <div class="post-content">
-                        <div class="post-text">${post.content || '貼文內容...'}</div>
-                        <div class="post-meta">
-                            <span>👁️ ${(post.views || 0).toLocaleString()}</span>
-                            <span>❤️ ${(post.likes || 0).toLocaleString()}</span>
-                            <span>💬 ${(post.comments || 0).toLocaleString()}</span>
+            const date = new Date(post.timestamp).toLocaleString('zh-TW');
+            
+            const html = `
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-2">帳號</h4>
+                        <span class="badge badge-primary">${post.account}</span>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-2">發文時間</h4>
+                        <p>${date}</p>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-2">貼文內容</h4>
+                        <p class="whitespace-pre-wrap">${post.content || ''}</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-2">主題</h4>
+                            <p>${post.topic || '-'}</p>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-2">地區</h4>
+                            <p>${post.region || '-'}</p>
                         </div>
                     </div>
+                    
+                    <div class="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                        <div class="text-center">
+                            <i class="far fa-eye text-2xl text-purple-600 mb-2"></i>
+                            <p class="text-2xl font-bold">${(post.views || 0).toLocaleString()}</p>
+                            <p class="text-sm text-gray-600">瀏覽</p>
+                        </div>
+                        <div class="text-center">
+                            <i class="far fa-heart text-2xl text-red-600 mb-2"></i>
+                            <p class="text-2xl font-bold">${(post.likes || 0).toLocaleString()}</p>
+                            <p class="text-sm text-gray-600">愛心</p>
+                        </div>
+                        <div class="text-center">
+                            <i class="far fa-comment text-2xl text-blue-600 mb-2"></i>
+                            <p class="text-2xl font-bold">${(post.replies || 0).toLocaleString()}</p>
+                            <p class="text-sm text-gray-600">留言</p>
+                        </div>
+                    </div>
+                    
+                    ${post.permalink ? `
+                        <a href="${post.permalink}" target="_blank" class="btn-primary w-full inline-block text-center">
+                            <i class="fas fa-external-link-alt mr-2"></i>
+                            在 Threads 查看
+                        </a>
+                    ` : ''}
                 </div>
-            `).join('');
-        }
-
-        // Update posts list
-        function updatePostsList() {
-            const container = document.getElementById('postsList');
+            `;
             
-            if (filteredPosts.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #666; padding: 2rem;">沒有符合條件的貼文</p>';
-                return;
-            }
-
-            container.innerHTML = filteredPosts.slice(0, 20).map(post => `
-                <div class="post-item">
-                    <div class="post-header">
-                        <span class="post-date">${post.date || '未知日期'}</span>
-                        <button class="view-detail-btn" onclick="viewPostDetail('${post.id}')">查看詳情</button>
-                    </div>
-                    <div class="post-tags">
-                        ${post.topic ? `<span class="tag">${post.topic}</span>` : ''}
-                        ${post.region ? `<span class="tag">${post.region}</span>` : ''}
-                    </div>
-                    <div class="post-stats">
-                        <span>👁️ ${(post.views || 0).toLocaleString()}</span>
-                        <span>❤️ ${(post.likes || 0).toLocaleString()}</span>
-                        <span>💬 ${(post.comments || 0).toLocaleString()}</span>
-                        <span>🔄 ${(post.shares || 0).toLocaleString()}</span>
-                    </div>
-                </div>
-            `).join('');
+            document.getElementById('detailContent').innerHTML = html;
+            document.getElementById('detailModal').classList.add('active');
         }
-
-        // Modal functions
-        function openPostModal() {
-            document.getElementById('postModal').classList.add('active');
-        }
-
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
-        }
-
-        // Submit post
-        async function submitPost(event) {
+        
+        // ═══════════════════════════════════════════════════════
+        // 發文功能
+        // ═══════════════════════════════════════════════════════
+        
+        function submitPost(event) {
             event.preventDefault();
             
             const postData = {
                 action: 'createPost',
-                content: document.getElementById('postContent').value,
-                topic: document.getElementById('postTopic').value,
-                region: document.getElementById('postRegion').value,
-                cta: document.getElementById('postCTA').value
+                account: document.getElementById('publishAccount').value,
+                content: document.getElementById('publishContent').value,
+                imageUrl: document.getElementById('publishImage').value,
+                topic: document.getElementById('publishTopic').value,
+                region: document.getElementById('publishRegion').value
             };
-
-            try {
-                const response = await fetch(CONFIG.API_URL, {
-                    method: 'POST',
-                    body: JSON.stringify(postData)
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert('✅ 貼文發布成功！');
-                    closeModal('postModal');
-                    refreshData();
-                } else {
-                    alert('❌ 發布失敗：' + result.message);
-                }
-            } catch (error) {
-                console.error('Error submitting post:', error);
-                alert('❌ 發布失敗，請稍後再試');
-            }
+            
+            showLoading();
+            
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    
+                    if (result.success) {
+                        alert('發布成功！');
+                        closePublishModal();
+                        refreshData();
+                    } else {
+                        alert('發布失敗：' + result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    alert('發布失敗：' + error.message);
+                })
+                .createPost(postData);
         }
-
-        // Audience insights
-        async function fetchAudienceInsights() {
-            try {
-                const response = await fetch(`${CONFIG.API_URL}?action=fetchAudienceInsights`);
-                const data = await response.json();
-                
-                if (data.status === 'success') {
-                    alert('✅ 受眾洞察已更新至試算表「受眾洞察紀錄」');
-                    console.log('Audience data:', data.insights);
-                } else {
-                    alert('❌ 無法取得受眾洞察：' + data.message);
-                }
-            } catch (error) {
-                console.error('Error fetching insights:', error);
-                alert('❌ 無法取得受眾洞察');
-            }
+        
+        // ═══════════════════════════════════════════════════════
+        // 工具函式
+        // ═══════════════════════════════════════════════════════
+        
+        function refreshData() {
+            showLoading();
+            loadData();
         }
-
-        function viewPostDetail(postId) {
-            const post = allPosts.find(p => p.id === postId);
-            if (post) {
-                alert('貼文詳情：\n' + JSON.stringify(post, null, 2));
-            }
+        
+        function showLoading() {
+            const btn = document.getElementById('refreshBtn');
+            btn.innerHTML = '<span class="loading"></span>';
         }
-
-        function sortTop3(sortBy) {
-            // Implement sorting logic
-            fetchTop3Posts();
+        
+        function hideLoading() {
+            const btn = document.getElementById('refreshBtn');
+            btn.innerHTML = '更新數據';
         }
     </script>
 </body>
