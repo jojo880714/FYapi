@@ -11,10 +11,10 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 // 你的 Google Apps Script 部署網址
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzS7BWNkS9uVAlNmLb9UpNy_qRJqux-2LCAUfZ44X-P0KDEp7sHpOK62pc1Izpn4MIN/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzLDLLDeBzre3Xdf3wNqbICohlGSOXsHQP-Inbym8XlkhmjJdlVBrFrmv6DZDL8ga94/exec";
 
 // 你的 Webhook 驗證權杖 (與 Meta 後台填寫的一致)
-const VERIFY_TOKEN = "my_secret_token_123";
+const VERIFY_TOKEN = "https://my-threads-api.onrender.com/webhook";
 
 app.use(express.json());
 
