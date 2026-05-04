@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TKB Threads 監控中心</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg-base:#0d0f14;--bg-surface:#141720;--bg-elevated:#1a1e2a;--bg-hover:#1f2435;--border:#252b3a;--border-light:#2e3547;--text-primary:#e8eaf0;--text-secondary:#8b93a8;--text-muted:#5a6275;--accent:#4f7cff;--accent-soft:rgba(79,124,255,0.12);--accent-glow:rgba(79,124,255,0.25);--green:#2dd4a0;--green-soft:rgba(45,212,160,0.12);--red:#ff5e7a;--red-soft:rgba(255,94,122,0.12);--yellow:#f5c842;--yellow-soft:rgba(245,200,66,0.12);--purple:#a78bfa;--purple-soft:rgba(167,139,250,0.12);--orange:#fb923c;--sidebar-w:220px;--radius:10px;--radius-lg:14px;--font:'Noto Sans TC',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary);min-height:100vh;display:flex;overflow:hidden}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:99px}
+#sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--bg-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto;position:fixed;left:0;top:0;bottom:0;z-index:100}
+.sidebar-logo{padding:20px 16px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.logo-mark{display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.logo-text{font-size:13px;font-weight:700;color:var(--text-primary);line-height:1.3}
+.logo-sub{font-size:10px;color:var(--text-muted);font-weight:400;letter-spacing:.05em}
+.sidebar-section{padding:12px 10px 4px;flex-shrink:0}
+.sidebar-section-label{font-size:9px;font-weight:600;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase;padding:0 6px;margin-bottom:4px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--text-secondary);font-size:13px;font-weight:500;transition:all .15s;margin-bottom:2px;user-select:none}
+.nav-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.nav-item.active{background:var(--accent-soft);color:var(--accent)}
+.nav-icon{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.sidebar-footer{margin-top:auto;padding:12px 10px;border-top:1px solid var(--border);flex-shrink:0}
+.system-status{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-elevated);border-radius:8px;border:1px solid var(--border)}
+.status-dot{width:7px;height:7px;border-radius:99px;background:var(--green);box-shadow:0 0 6px var(--green);flex-shrink:0;animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.5}}
+.status-text{font-size:11px;color:var(--text-secondary)}
+.status-version{font-size:10px;color:var(--text-muted);font-family:var(--font-mono)}
+#main{margin-left:var(--sidebar-w);flex:1;height:100vh;overflow-y:auto;display:flex;flex-direction:column}
+.page-header{padding:20px 28px 0;flex-shrink:0}
+.page-header-inner{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.page-title{font-size:22px;font-weight:700;color:var(--text-primary);letter-spacing:-.02em}
+.page-subtitle{font-size:13px;color:var(--text-muted);margin-top:3px}
+.header-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.page-content{padding:20px 28px 28px;flex:1}
+.page{display:none}.page.active{display:block}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:var(--font);white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#3d6ef0;transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--text-secondary);border:1px solid var(--border-light)}.btn-ghost:hover{background:var(--bg-hover);color:var(--text-primary)}
+.btn-green{background:var(--green);color:#0a1a14}.btn-green:hover{opacity:.9}
+.btn-lg{padding:11px 20px;font-size:13px;border-radius:var(--radius);width:100%;justify-content:center}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.blue::before{background:var(--accent)}.stat-card.green::before{background:var(--green)}.stat-card.red::before{background:var(--red)}.stat-card.purple::before{background:var(--purple)}
+.stat-label{font-size:11px;color:var(--text-muted);font-weight:500;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.stat-value{font-size:26px;font-weight:700;color:var(--text-primary);letter-spacing:-.03em;font-family:var(--font-mono);line-height:1;margin-bottom:6px}
+.stat-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px}
+.stat-badge.up{background:var(--green-soft);color:var(--green)}.stat-badge.down{background:var(--red-soft);color:var(--red)}.stat-badge.neutral{background:var(--bg-elevated);color:var(--text-muted)}
+.charts-grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:20px}
+.chart-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.chart-title{font-size:13px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:6px}
+.chart-subtitle{font-size:11px;color:var(--text-muted);margin-top:2px}
+.chart-canvas-wrap{position:relative;height:200px}
+.section-title{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.account-tabs{display:flex;gap:6px;background:var(--bg-elevated);padding:4px;border-radius:10px;border:1px solid var(--border)}
+.account-tab{padding:6px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;color:var(--text-secondary);border:none;background:transparent;font-family:var(--font)}
+.account-tab.active{background:var(--accent);color:#fff}
+.account-tab:not(.active):hover{background:var(--bg-hover);color:var(--text-primary)}
+.followers-section{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;margin-bottom:20px}
+.followers-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.follower-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.follower-account{font-size:11px;font-weight:700;margin-bottom:4px}
+.follower-count{font-size:22px;font-weight:700;font-family:var(--font-mono);letter-spacing:-.02em}
+.follower-change{font-size:10px;margin-top:3px}.follower-change.up{color:var(--green)}.follower-change.down{color:var(--red)}
+.top3-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.top3-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;position:relative}
+.top3-rank{position:absolute;top:14px;right:14px;font-size:22px;opacity:.15;font-weight:900;font-family:var(--font-mono)}
+.top3-card:nth-child(1) .top3-rank{color:var(--yellow);opacity:.5}
+.top3-views{font-size:24px;font-weight:700;font-family:var(--font-mono);color:var(--text-primary);letter-spacing:-.03em;margin-bottom:4px}
+.top3-content{font-size:12px;color:var(--text-secondary);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:10px}
+.top3-footer{display:flex;align-items:center;justify-content:space-between}
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.filter-select,.filter-input{background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-primary);font-size:12px;padding:7px 12px;border-radius:8px;outline:none;font-family:var(--font)}
+.filter-select{cursor:pointer}.filter-select:focus,.filter-input:focus{border-color:var(--accent)}
+.filter-input::placeholder{color:var(--text-muted)}.filter-input{flex:1;min-width:200px}
+.post-table{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.post-table-header,.post-row{display:grid;grid-template-columns:2fr 1fr 80px 80px 80px 80px 100px;padding:10px 16px;align-items:center}
+.post-table-header{background:var(--bg-elevated);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase}
+.post-row{border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer;padding:12px 16px}
+.post-row:last-child{border-bottom:none}.post-row:hover{background:var(--bg-hover)}
+.post-content-text{font-size:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+.post-meta{display:flex;align-items:center;gap:6px;margin-top:3px}
+.post-account-badge{font-size:10px;padding:1px 6px;border-radius:99px;font-weight:600}
+.badge-play{background:var(--green-soft);color:var(--green)}.badge-usca{background:var(--accent-soft);color:var(--accent)}.badge-ukau{background:var(--purple-soft);color:var(--purple)}
+.post-date{font-size:10px;color:var(--text-muted)}
+.topic-badge{font-size:10px;padding:2px 8px;border-radius:99px;background:var(--bg-elevated);color:var(--text-secondary);border:1px solid var(--border-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;display:inline-block}
+.metric-cell{font-size:12px;font-family:var(--font-mono);color:var(--text-secondary)}
+.post-table-body{max-height:480px;overflow-y:auto}
+.copy-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;height:calc(100vh - 140px)}
+.copy-panel{display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding-right:4px}
+.copy-control-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px}
+.copy-control-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.copy-select{background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-primary);font-size:12px;padding:7px 12px;border-radius:8px;outline:none;font-family:var(--font);cursor:pointer;flex:1;min-width:120px}
+.copy-select:focus{border-color:var(--accent)}
+.profile-select-bar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--accent-soft);border:1px solid rgba(79,124,255,.2);border-radius:8px;margin-bottom:12px}
+.profile-label{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+.profile-sel{background:transparent;border:none;color:var(--text-primary);font-size:12px;font-weight:600;font-family:var(--font);outline:none;cursor:pointer;flex:1}
+.advanced-toggle{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text-secondary);cursor:pointer;padding:4px 0;user-select:none}
+.advanced-toggle:hover{color:var(--text-primary)}
+.advanced-panel{display:none;flex-direction:column;gap:10px;padding-top:10px;border-top:1px solid var(--border);margin-top:8px}
+.advanced-panel.open{display:flex}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-label{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em}
+.form-input,.form-textarea{background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-primary);font-size:12px;padding:8px 12px;border-radius:8px;outline:none;font-family:var(--font);transition:border-color .15s;width:100%}
+.form-input:focus,.form-textarea:focus{border-color:var(--accent)}
+.form-input::placeholder,.form-textarea::placeholder{color:var(--text-muted)}
+.form-textarea{resize:vertical;min-height:60px}
+.copy-input-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;flex:1;display:flex;flex-direction:column}
+.copy-input-header{padding:10px 14px;background:var(--bg-elevated);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.input-type-tabs{display:flex;gap:4px;background:var(--bg-surface);padding:3px;border-radius:7px;border:1px solid var(--border)}
+.input-type-tab{padding:4px 10px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text-muted);font-family:var(--font);transition:all .15s}
+.input-type-tab.active{background:var(--bg-elevated);color:var(--text-primary)}
+.copy-textarea{flex:1;background:transparent;border:none;color:var(--text-primary);font-size:13px;padding:14px;resize:none;outline:none;font-family:var(--font);line-height:1.7;min-height:180px}
+.copy-textarea::placeholder{color:var(--text-muted)}
+.copy-output-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);display:flex;flex-direction:column;overflow:hidden;height:100%}
+.version-tabs{display:flex;gap:0;background:var(--bg-elevated);border-bottom:1px solid var(--border);overflow-x:auto}
+.version-tab{padding:10px 14px;font-size:11px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text-muted);font-family:var(--font);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+.version-tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--accent-soft)}
+.copy-output-area{flex:1;overflow-y:auto;position:relative}
+.copy-output-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;pointer-events:none;gap:8px}
+.placeholder-icon{font-size:32px;opacity:.3}
+.copy-output-textarea{width:100%;height:100%;min-height:280px;background:transparent;border:none;color:var(--text-primary);font-size:13px;padding:14px;resize:none;outline:none;font-family:var(--font);line-height:1.7}
+.copy-footer{padding:10px 14px;background:var(--bg-elevated);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
+.char-count{font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+.hashtag-area{padding:10px 14px;background:var(--bg-elevated);border-top:1px solid var(--border);flex-shrink:0}
+.hashtag-label{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.hashtag-list{display:flex;flex-wrap:wrap;gap:5px}
+.hashtag-chip{font-size:11px;padding:3px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);border:1px solid rgba(79,124,255,.2)}
+.schedule-from-copy{display:none;padding:0 14px 12px}
+.schedule-from-copy.show{display:block}
+.schedule-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.schedule-form{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;display:flex;flex-direction:column;gap:12px}
+.schedule-list{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.schedule-list-header{padding:12px 16px;background:var(--bg-elevated);border-bottom:1px solid var(--border);font-size:13px;font-weight:600;color:var(--text-primary)}
+.schedule-item{padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+.schedule-item:last-child{border-bottom:none}.schedule-item:hover{background:var(--bg-hover)}
+.schedule-item-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.schedule-item-account{font-size:11px;font-weight:700}
+.schedule-item-time{font-size:10px;color:var(--text-muted);font-family:var(--font-mono)}
+.schedule-item-content{font-size:12px;color:var(--text-secondary);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.status-chip{font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px}
+.status-pending{background:var(--yellow-soft);color:var(--yellow)}.status-done{background:var(--green-soft);color:var(--green)}.status-error{background:var(--red-soft);color:var(--red)}
+.analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.ai-chat-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column}
+.ai-chat-header{padding:12px 16px;background:var(--bg-elevated);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.ai-dot{width:8px;height:8px;background:var(--green);border-radius:99px;box-shadow:0 0 6px var(--green)}
+.ai-messages{flex:1;padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:300px;max-height:400px}
+.ai-msg{max-width:90%;font-size:12px;line-height:1.6}
+.ai-msg.user{align-self:flex-end;background:var(--accent-soft);color:var(--text-primary);padding:8px 12px;border-radius:10px 10px 2px 10px;border:1px solid rgba(79,124,255,.2)}
+.ai-msg.bot{align-self:flex-start;background:var(--bg-elevated);color:var(--text-primary);padding:8px 12px;border-radius:2px 10px 10px 10px;border:1px solid var(--border)}
+.ai-input-row{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--border);background:var(--bg-elevated)}
+.ai-input{flex:1;background:var(--bg-surface);border:1px solid var(--border-light);color:var(--text-primary);font-size:12px;padding:8px 12px;border-radius:8px;outline:none;font-family:var(--font)}
+.ai-input::placeholder{color:var(--text-muted)}.ai-input:focus{border-color:var(--accent)}
+.quick-questions{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-top:1px solid var(--border)}
+.quick-q{font-size:11px;padding:4px 10px;border-radius:99px;background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-secondary);cursor:pointer;transition:all .15s}
+.quick-q:hover{background:var(--accent-soft);border-color:rgba(79,124,255,.3);color:var(--accent)}
+.control-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.control-btn-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:6px}
+.control-btn-card:hover{border-color:var(--accent);background:var(--accent-soft);transform:translateY(-1px)}
+.control-icon{font-size:20px;margin-bottom:4px}
+.control-name{font-size:12px;font-weight:600;color:var(--text-primary)}
+.control-desc{font-size:10px;color:var(--text-muted);line-height:1.4}
+.token-status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.token-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;display:flex;align-items:center;gap:10px}
+.token-account{font-size:12px;font-weight:600;color:var(--text-primary)}
+.token-status-text{font-size:10px;color:var(--text-muted);margin-top:2px}
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px}
+.divider{height:1px;background:var(--border);margin:4px 0}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;color:var(--text-muted);text-align:center;gap:8px}
+.empty-icon{font-size:36px;opacity:.3}.empty-title{font-size:14px;font-weight:600;color:var(--text-secondary)}.empty-desc{font-size:12px;line-height:1.5}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-primary);padding:10px 18px;border-radius:99px;font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:all .25s;white-space:nowrap;display:flex;align-items:center;gap:7px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon">📡</div>
+      <div><div class="logo-text">TKB Threads</div><div class="logo-sub">社群監控中心</div></div>
+    </div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">數據分析</div>
+    <div class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span><span>總覽 Dashboard</span></div>
+    <div class="nav-item" data-page="posts"><span class="nav-icon">📋</span><span>貼文管理</span></div>
+    <div class="nav-item" data-page="analytics"><span class="nav-icon">🤖</span><span>AI 數據分析</span></div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">內容操作</div>
+    <div class="nav-item" data-page="copywriter"><span class="nav-icon">✍️</span><span>文案產生器</span></div>
+    <div class="nav-item" data-page="schedule"><span class="nav-icon">📅</span><span>排程發文</span></div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">系統</div>
+    <div class="nav-item" data-page="system"><span class="nav-icon">⚙️</span><span>系統設定</span></div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="system-status">
+      <div class="status-dot"></div>
+      <div><div class="status-text">系統運作中</div><div class="status-version" id="api-url-indicator">API 未設定</div></div>
+    </div>
+  </div>
+</nav>
+
+<div id="main">
+
+<!-- DASHBOARD -->
+<div class="page active" id="page-dashboard">
+  <div class="page-header">
+    <div class="page-header-inner">
+      <div><div class="page-title">總覽 Dashboard</div><div class="page-subtitle">TKB 放洋留遊學 · Threads 社群數據總覽</div></div>
+      <div class="header-actions">
+        <div class="account-tabs">
+          <button class="account-tab active" onclick="setAccountFilter('all',this)">全部</button>
+          <button class="account-tab" onclick="setAccountFilter('tkbletsplay_',this)">遊學</button>
+          <button class="account-tab" onclick="setAccountFilter('tkbletsgo.usca',this)">美加</button>
+          <button class="account-tab" onclick="setAccountFilter('tkbletsgo.ukau',this)">英澳</button>
+        </div>
+        <button class="btn btn-primary" onclick="syncData()"><span id="sync-spinner" style="display:none"><span class="spinner"></span></span><span id="sync-text">⟳ 一鍵同步</span></button>
+      </div>
+    </div>
+  </div>
+  <div class="page-content">
+    <div class="stats-grid">
+      <div class="stat-card blue"><div class="stat-label">📄 總貼文數</div><div class="stat-value" id="stat-posts">—</div><span class="stat-badge neutral" id="stat-posts-badge">載入中</span></div>
+      <div class="stat-card green"><div class="stat-label">👁 總瀏覽數</div><div class="stat-value" id="stat-views">—</div><span class="stat-badge neutral" id="stat-views-badge">載入中</span></div>
+      <div class="stat-card red"><div class="stat-label">❤️ 總愛心數</div><div class="stat-value" id="stat-likes">—</div><span class="stat-badge neutral">全時段</span></div>
+      <div class="stat-card purple"><div class="stat-label">💬 總留言數</div><div class="stat-value" id="stat-replies">—</div><span class="stat-badge neutral">全時段</span></div>
+    </div>
+    <div class="followers-section">
+      <div class="chart-header" style="margin-bottom:12px">
+        <div><div class="chart-title">👥 帳號追蹤數</div><div class="chart-subtitle">各帳號月度成長</div></div>
+      </div>
+      <div class="followers-cards">
+        <div class="follower-card"><div class="follower-account" style="color:var(--green)">🎓 遊學 @tkbletsplay_</div><div class="follower-count" id="follower-play">—</div><div class="follower-change" id="follower-play-change">載入中...</div></div>
+        <div class="follower-card"><div class="follower-account" style="color:var(--accent)">🇺🇸 美加 @tkbletsgo.usca</div><div class="follower-count" id="follower-usca">—</div><div class="follower-change" id="follower-usca-change">載入中...</div></div>
+        <div class="follower-card"><div class="follower-account" style="color:var(--purple)">🇬🇧 英澳 @tkbletsgo.ukau</div><div class="follower-count" id="follower-ukau">—</div><div class="follower-change" id="follower-ukau-change">載入中...</div></div>
+      </div>
+      <div style="height:140px"><canvas id="followersChart"></canvas></div>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card"><div class="chart-header"><div><div class="chart-title">📈 30天發文趨勢</div><div class="chart-subtitle">發文篇數與總瀏覽量</div></div></div><div class="chart-canvas-wrap"><canvas id="trendChart"></canvas></div></div>
+      <div class="chart-card"><div class="chart-header"><div><div class="chart-title">🎯 主題分布</div><div class="chart-subtitle">各主題貼文佔比</div></div></div><div class="chart-canvas-wrap"><canvas id="topicChart"></canvas></div></div>
+    </div>
+    <div class="section-title">🏆 Top 3 高瀏覽貼文</div>
+    <div class="top3-grid" id="top3-container"><div style="grid-column:span 3;text-align:center;padding:24px;color:var(--text-muted)">載入中...</div></div>
+  </div>
+</div>
+
+<!-- POSTS -->
+<div class="page" id="page-posts">
+  <div class="page-header">
+    <div class="page-header-inner">
+      <div><div class="page-title">貼文管理</div><div class="page-subtitle">瀏覽、篩選所有貼文數據</div></div>
+      <div class="header-actions">
+        <button class="btn btn-ghost" onclick="execAction('reclassifyAllPosts')">🔄 重新分類</button>
+        <button class="btn btn-ghost" onclick="execAction('fetchNewPosts')">📥 抓新貼文</button>
+        <button class="btn btn-primary" onclick="execAction('collectMetricsAndCheckCTA')">📊 更新指標</button>
+      </div>
+    </div>
+  </div>
+  <div class="page-content">
+    <div class="filter-bar">
+      <select class="filter-select" id="pf-account" onchange="loadPosts()"><option value="">全部帳號</option><option value="tkbletsplay_">遊學</option><option value="tkbletsgo.usca">美加</option><option value="tkbletsgo.ukau">英澳</option></select>
+      <select class="filter-select" id="pf-topic" onchange="loadPosts()"><option value="">全部主題</option></select>
+      <select class="filter-select" id="pf-month" onchange="loadPosts()"><option value="">全部月份</option><option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4">4月</option><option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option><option value="9">9月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option></select>
+      <input class="filter-input" type="text" id="pf-kw" placeholder="🔍 搜尋貼文內容..." oninput="debounce(loadPosts,400)">
+    </div>
+    <div class="post-table">
+      <div class="post-table-header"><div>內容</div><div>主題</div><div>瀏覽</div><div>愛心</div><div>留言</div><div>轉發</div><div>互動率</div></div>
+      <div class="post-table-body" id="post-body"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">請設定 API URL</div></div></div>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--text-muted);text-align:right" id="post-count"></div>
+  </div>
+</div>
+
+<!-- ANALYTICS -->
+<div class="page" id="page-analytics">
+  <div class="page-header"><div class="page-header-inner"><div><div class="page-title">AI 數據分析</div><div class="page-subtitle">讓 AI 幫你解讀數據、提供建議</div></div></div></div>
+  <div class="page-content">
+    <div class="analytics-grid">
+      <div class="chart-card"><div class="chart-header"><div><div class="chart-title">📊 各主題平均瀏覽</div><div class="chart-subtitle">主題成效比較</div></div></div><div class="chart-canvas-wrap"><canvas id="topicBarChart"></canvas></div></div>
+      <div class="chart-card"><div class="chart-header"><div><div class="chart-title">📅 月度發文統計</div><div class="chart-subtitle">各帳號月度篇數</div></div></div><div class="chart-canvas-wrap"><canvas id="monthlyChart"></canvas></div></div>
+    </div>
+    <div class="ai-chat-card">
+      <div class="ai-chat-header"><div class="ai-dot"></div><div><div style="font-size:13px;font-weight:600;color:var(--text-primary)">AI 數據顧問</div><div style="font-size:10px;color:var(--text-muted)">基於你的 Threads 數據分析</div></div></div>
+      <div class="quick-questions">
+        <div class="quick-q" onclick="askAI('這個月哪個主題的表現最好？')">📈 本月最佳主題</div>
+        <div class="quick-q" onclick="askAI('根據數據，下週建議發哪類貼文？')">📅 下週發文建議</div>
+        <div class="quick-q" onclick="askAI('哪些貼文的互動率異常高？原因是什麼？')">🔥 高互動分析</div>
+        <div class="quick-q" onclick="askAI('三個帳號的成效比較如何？')">📊 帳號比較</div>
+      </div>
+      <div class="ai-messages" id="ai-messages">
+        <div class="ai-msg bot">👋 你好！我是你的 AI 數據顧問。<br>你可以問我任何關於 Threads 數據的問題，例如主題成效、發文建議、互動率分析等。</div>
+      </div>
+      <div class="ai-input-row">
+        <input class="ai-input" type="text" id="ai-input" placeholder="例如：這個月哪類文章表現最好？" onkeydown="if(event.key==='Enter')sendAI()">
+        <button class="btn btn-primary" onclick="sendAI()">傳送</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COPYWRITER -->
+<div class="page" id="page-copywriter">
+  <div class="page-header">
+    <div class="page-header-inner">
+      <div><div class="page-title">文案產生器</div><div class="page-subtitle">去 AI 化文案翻譯 · 產出後可直接排程發文</div></div>
+      <div class="header-actions"><button class="btn btn-ghost" onclick="clearCopy()">🗑️ 清除</button></div>
+    </div>
+  </div>
+  <div class="page-content" style="padding-top:16px">
+    <div class="copy-layout">
+      <div class="copy-panel">
+        <div class="copy-control-card">
+          <div class="profile-select-bar">
+            <div class="profile-label">風格設定檔</div>
+            <select class="profile-sel" id="copy-profile">
+              <option value="study_abroad">遊學小編（活潑知性）</option>
+              <option value="usa_canada">美加留學（專業精準）</option>
+              <option value="uk_aus">英澳留學（輕鬆幽默）</option>
+              <option value="promo">活動推廣（CTA 強烈）</option>
+            </select>
+          </div>
+          <div class="copy-control-row">
+            <select class="copy-select" id="copy-platform"><option value="Threads">Threads</option><option value="IG 貼文">IG 貼文</option><option value="Facebook">Facebook</option></select>
+            <select class="copy-select" id="copy-tone"><option value="輕鬆幽默">輕鬆幽默</option><option value="專業清晰">專業清晰</option><option value="平價學生版">平價學生版</option><option value="溫暖知性">溫暖知性</option></select>
+          </div>
+          <div class="advanced-toggle" onclick="toggleAdv()"><span>⚙️ 進階設定（人設、Emoji、範本）</span><span id="adv-arrow">›</span></div>
+          <div class="advanced-panel" id="adv-panel">
+            <div class="form-group"><div class="form-label">品牌人設</div><input class="form-input" id="copy-persona" placeholder="例如：專注英澳留學的代辦，說話像朋友而非業務..."></div>
+            <div class="form-group"><div class="form-label">Threads 主文篇數</div><select class="copy-select" id="copy-tc" style="flex:none"><option value="1">不拆分（1篇）</option><option value="2">拆成 2 篇</option><option value="3">拆成 3 篇</option></select></div>
+            <div class="form-group"><div class="form-label">Emoji 濃度</div><select class="copy-select" id="copy-emoji" style="flex:none"><option value="1">極少（僅關鍵處點綴）</option><option value="2" selected>適中（自然融入）</option><option value="3">豐富（活潑強烈）</option></select></div>
+            <div class="form-group"><div class="form-label">列表格式</div><select class="copy-select" id="copy-listfmt" style="flex:none"><option value="none">預設（由 AI 決定）</option><option value="1.">數字 (1. 2. 3.)</option><option value="(1)">括號數字 ((1) (2) (3))</option><option value="1️⃣">Emoji 數字 (1️⃣ 2️⃣ 3️⃣)</option><option value="-">橫線 (- - -)</option><option value="•">圓點 (• • •)</option><option value="✅">勾勾 (✅ ✅ ✅)</option></select></div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text-secondary)"><input type="checkbox" id="copy-reply"> 加入小編補充回文</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text-secondary)"><input type="checkbox" id="copy-hashtags" checked> 自動生成 Hashtags</label>
+          </div>
+        </div>
+        <div class="copy-input-card">
+          <div class="copy-input-header">
+            <div style="font-size:11px;font-weight:600;color:var(--text-secondary)">● 輸入來源</div>
+            <div class="input-type-tabs"><button class="input-type-tab active" onclick="setIT('text',this)">文字</button><button class="input-type-tab" onclick="setIT('url',this)">網址</button></div>
+          </div>
+          <textarea class="copy-textarea" id="copy-input" placeholder="請在此貼上生硬的 AI 草稿或原始條列資料..."></textarea>
+        </div>
+        <button class="btn btn-primary btn-lg" id="copy-btn" onclick="genCopy()">✨ 執行去 AI 化（產出雙版本）</button>
+      </div>
+      <div class="copy-output-card">
+        <div class="version-tabs" id="ver-tabs"><div class="version-tab active">小編語氣（去 AI 化）</div></div>
+        <div class="copy-output-area">
+          <div class="copy-output-placeholder" id="copy-ph"><div class="placeholder-icon">✍️</div><div>翻譯結果將顯示於此</div><div style="font-size:11px">您可以直接在此微調</div></div>
+          <textarea class="copy-output-textarea" id="copy-out" style="display:none" oninput="updCC()"></textarea>
+        </div>
+        <div class="hashtag-area" id="ht-area" style="display:none">
+          <div class="hashtag-label"><span># 推薦 Hashtags</span><span style="cursor:pointer;color:var(--accent);font-size:10px" onclick="copyHT()">複製全部</span></div>
+          <div class="hashtag-list" id="ht-list"></div>
+        </div>
+        <div class="schedule-from-copy" id="sfc"><button class="btn btn-green btn-lg" onclick="toSched()">📅 將此版本加入排程發文</button></div>
+        <div class="copy-footer"><div class="char-count" id="cc">尚未生成內容</div><div style="display:flex;gap:6px"><button class="btn btn-ghost" id="tone-btn" onclick="chkTone()" disabled>📊 語氣檢測</button><button class="btn btn-primary" id="cr-btn" onclick="cpRes()" disabled>📋 複製此版本</button></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCHEDULE -->
+<div class="page" id="page-schedule">
+  <div class="page-header">
+    <div class="page-header-inner">
+      <div><div class="page-title">排程發文</div><div class="page-subtitle">新增排程、管理預約發文</div></div>
+      <div class="header-actions"><button class="btn btn-ghost" onclick="execAction('processScheduledPosts')">▶ 執行排程</button></div>
+    </div>
+  </div>
+  <div class="page-content">
+    <div class="schedule-layout">
+      <div>
+        <div class="section-title" style="margin-bottom:10px">📝 排程表單</div>
+        <div class="schedule-form">
+          <div class="form-group"><div class="form-label">目標帳號</div><select class="copy-select" id="sa" style="width:100%"><option value="tkbletsplay_">遊學 @tkbletsplay_</option><option value="tkbletsgo.usca">美加 @tkbletsgo.usca</option><option value="tkbletsgo.ukau">英澳 @tkbletsgo.ukau</option></select></div>
+          <div class="form-group"><div class="form-label">發布時間</div><input class="form-input" id="st" type="datetime-local"></div>
+          <div class="form-group"><div class="form-label">主文內容</div><textarea class="form-textarea" id="sc" rows="5" placeholder="輸入貼文主文..."></textarea></div>
+          <div class="divider"></div>
+          <div class="form-group"><div class="form-label">回文 1（選填）</div><textarea class="form-textarea" id="sr1" rows="2" placeholder="第一則回文..."></textarea></div>
+          <div class="form-group"><div class="form-label">回文 1 延遲（分鐘）</div><input class="form-input" id="sd1" type="number" value="5" min="1"></div>
+          <div class="form-group"><div class="form-label">回文 2（選填）</div><textarea class="form-textarea" id="sr2" rows="2" placeholder="第二則回文..."></textarea></div>
+          <div class="form-group"><div class="form-label">回文 2 延遲（分鐘）</div><input class="form-input" id="sd2" type="number" value="30" min="1"></div>
+          <div class="divider"></div>
+          <div class="form-group"><div class="form-label">貼文主題</div><select class="copy-select" id="stopic" style="width:100%"><option>遊學</option><option>旅遊懶人包</option><option>留學情報</option><option>活動</option><option>榜單快訊</option><option>軟性文案</option><option>知識內容</option></select></div>
+          <button class="btn btn-primary btn-lg" onclick="submitSched()">📅 新增排程</button>
+        </div>
+      </div>
+      <div>
+        <div class="section-title" style="margin-bottom:10px">📋 排程清單</div>
+        <div class="schedule-list"><div class="schedule-list-header">預約中的發文</div><div id="sched-list"><div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">尚無排程</div><div class="empty-desc">從左側新增發文排程</div></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SYSTEM -->
+<div class="page" id="page-system">
+  <div class="page-header"><div class="page-header-inner"><div><div class="page-title">系統設定</div><div class="page-subtitle">GAS API 設定、Token 管理與系統操作</div></div></div></div>
+  <div class="page-content">
+    <div class="section-title">🔗 GAS Web App URL</div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="form-group" style="margin-bottom:12px"><div class="form-label">API Endpoint URL</div><input class="form-input" id="api-url-input" type="text" placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"></div>
+      <div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="saveApi()">💾 儲存</button><button class="btn btn-ghost" onclick="testApi()">🔌 測試連線</button></div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text-muted)" id="api-test-result"></div>
+    </div>
+    <div class="section-title">🤖 Gemini API Key</div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="form-group" style="margin-bottom:12px"><div class="form-label">API Key（儲存於瀏覽器本地）</div><input class="form-input" id="gem-key" type="password" placeholder="AIza..."></div>
+      <button class="btn btn-primary" onclick="saveGem()">💾 儲存</button>
+    </div>
+    <div class="section-title" style="margin-top:8px">🎛️ 系統操作面板</div>
+    <div class="control-grid">
+      <div class="control-btn-card" onclick="execAction('fetchNewPosts')"><div class="control-icon">📥</div><div class="control-name">抓新貼文</div><div class="control-desc">從 Threads 抓最新 15 篇</div></div>
+      <div class="control-btn-card" onclick="execAction('reclassifyAllPosts')"><div class="control-icon">🔄</div><div class="control-name">重新分類</div><div class="control-desc">用關鍵字重新分類所有貼文</div></div>
+      <div class="control-btn-card" onclick="execAction('collectMetricsAndCheckCTA')"><div class="control-icon">📊</div><div class="control-name">更新指標</div><div class="control-desc">更新總覽指標並補抓快照</div></div>
+      <div class="control-btn-card" onclick="execAction('backfillMissingMetrics')"><div class="control-icon">🔧</div><div class="control-name">補抓缺漏指標</div><div class="control-desc">強制補抓空白的時段欄位</div></div>
+      <div class="control-btn-card" onclick="execAction('updateMainSummary')"><div class="control-icon">📋</div><div class="control-name">更新總表</div><div class="control-desc">抓最新追蹤數、計算成長率</div></div>
+      <div class="control-btn-card" onclick="execAction('sortMonitorSheetByDate')"><div class="control-icon">📅</div><div class="control-name">手動排序</div><div class="control-desc">依發文時間由新到舊排序</div></div>
+    </div>
+    <div class="section-title">🔑 Token 狀態</div>
+    <div class="token-status-grid">
+      <div class="token-card"><div class="status-dot" id="tk-play" style="background:var(--text-muted);box-shadow:none"></div><div><div class="token-account">遊學 @tkbletsplay_</div><div class="token-status-text" id="tk-play-t">未驗證</div></div></div>
+      <div class="token-card"><div class="status-dot" id="tk-usca" style="background:var(--text-muted);box-shadow:none"></div><div><div class="token-account">美加 @tkbletsgo.usca</div><div class="token-status-text" id="tk-usca-t">未驗證</div></div></div>
+      <div class="token-card"><div class="status-dot" id="tk-ukau" style="background:var(--text-muted);box-shadow:none"></div><div><div class="token-account">英澳 @tkbletsgo.ukau</div><div class="token-status-text" id="tk-ukau-t">未驗證</div></div></div>
+    </div>
+    <div style="margin-top:10px"><button class="btn btn-ghost" onclick="execAction('testToken')">🔍 驗證所有 Token</button></div>
+  </div>
+</div>
+
+</div><!-- #main -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+const SYSTEM_PROMPT = `
+# Role
+你是專職於海外留遊學領域的資深社群行銷企劃與「遊學小編」。你的專長是將生硬、充滿「機器人味」的資料，轉譯為極具人味、接地氣的社群短貼文。
+
+# Rules: 寫作風格與排版規範
+1. 破題直接：開頭第一句話就要抓住眼球。
+2. 結構清晰，短平快：多用條列式排版，每段不要超過 3 句話。若有條列項目，每個項目務必獨立一行，並善用換行（Line breaks）留白，讓視覺不擁擠。
+3. 語氣設定：像是一個經驗豐富、說話實在的朋友。不講空話，只講「真實優點」與「真實缺點」。
+4. 結尾行動呼籲 (CTA)：結尾必須有輕鬆互動的問句或明確的導流指令。
+5. 視覺排版：善用半角空白分隔中英數字，適度使用 Emoji，並利用「—」作為段落分隔線。
+6. 標點符號限制 (極重要)：句尾盡量減少使用全形句號（。）與逗號（，），多以「換行」或「空格」取代，保持社群排版的流暢感與呼吸感。
+
+# Anti-AI Rules: 去 AI 化禁用詞庫 (出現即刻替換或刪除)
+- 嚴禁使用：在這個瞬息萬變的時代、讓我們一探究竟、不僅...更是、總而言之、無庸置疑、為您揭曉、宛如、絕對是你的不二之選。
+- 嚴禁語氣：過度讚美、像在念教科書、華而不實的形容詞。
+`;
+
+const API_URL_KEY='gas_api_url',GEM_KEY='gemini_api_key';
+let API='',GEM='',accFilter='all',allPosts=[],vers=[],hts=[],actVer=0,charts={},dTimer=null,aiPosts=null,aiStats=null;
+
+window.addEventListener('DOMContentLoaded',()=>{
+  API=localStorage.getItem(API_URL_KEY)||'';
+  GEM=localStorage.getItem(GEM_KEY)||'';
+  if(API){document.getElementById('api-url-input').value=API;document.getElementById('api-url-indicator').textContent='API 已設定'}
+  if(GEM)document.getElementById('gem-key').value=GEM;
+  initCharts();
+  if(API){loadDash();loadFOpts();}
+  document.querySelectorAll('.nav-item').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const pg=el.dataset.page;
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+      document.getElementById('page-'+pg).classList.add('active');
+      el.classList.add('active');
+      if(pg==='posts'&&allPosts.length===0)loadPosts();
+      if(pg==='analytics')loadAnalytics();
+    });
+  });
+});
+
+// API
+async function ag(p){if(!API){toast('⚠️ 請先設定 GAS API URL');return null;}const u=new URL(API);Object.entries(p).forEach(([k,v])=>u.searchParams.set(k,v));try{const r=await fetch(u.toString());const j=await r.json();if(j.success===false)throw new Error(j.message);return j.data!==undefined?j.data:j;}catch(e){toast('❌ '+e.message);return null;}}
+async function ap(b){if(!API){toast('⚠️ 請先設定 GAS API URL');return null;}try{const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return await r.json();}catch(e){toast('❌ '+e.message);return null;}}
+async function execAction(n){toast('⏳ 執行中：'+n);const r=await ag({action:'executeAction',name:n});if(r){toast('✅ 完成：'+n);}return r;}
+
+// 設定
+function saveApi(){const u=document.getElementById('api-url-input').value.trim();API=u;localStorage.setItem(API_URL_KEY,u);document.getElementById('api-url-indicator').textContent=u?'API 已設定':'API 未設定';toast('✅ API URL 已儲存');if(u){loadDash();loadFOpts();}}
+function saveGem(){GEM=document.getElementById('gem-key').value.trim();localStorage.setItem(GEM_KEY,GEM);toast('✅ Gemini Key 已儲存');}
+async function testApi(){const el=document.getElementById('api-test-result');el.textContent='測試中...';const r=await ag({action:'getStats'});if(r){el.style.color='var(--green)';el.textContent='✅ 連線成功！共 '+r.totalPosts+' 筆貼文';}else{el.style.color='var(--red)';el.textContent='❌ 連線失敗';}}
+
+// Dashboard
+async function loadDash(){
+  const[s,tr,tp,t3,fw]=await Promise.all([ag({action:'getStats'}),ag({action:'getTrend',days:30}),ag({action:'getTopicDist'}),ag({action:'getTop3',metric:'views'}),ag({action:'getFollowersData'})]);
+  if(s)updStats(s);if(tr)updTrend(tr);if(tp)updTopic(tp);if(t3)updTop3(t3);if(fw)updFW(fw);
+}
+function setAccountFilter(a,el){accFilter=a;document.querySelectorAll('.account-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');reloadDash();}
+async function reloadDash(){const p=accFilter!=='all'?{account:accFilter}:{};const[tr,tp,t3]=await Promise.all([ag({action:'getTrend',days:30,...p}),ag({action:'getTopicDist',...p}),ag({action:'getTop3',metric:'views',...p})]);if(tr)updTrend(tr);if(tp)updTopic(tp);if(t3)updTop3(t3);}
+async function syncData(){document.getElementById('sync-spinner').style.display='inline-block';document.getElementById('sync-text').textContent='同步中...';await execAction('collectMetricsAndCheckCTA');await loadDash();document.getElementById('sync-spinner').style.display='none';document.getElementById('sync-text').textContent='⟳ 一鍵同步';}
+function updStats(s){document.getElementById('stat-posts').textContent=fn(s.totalPosts);document.getElementById('stat-views').textContent=fn(s.totalViews);document.getElementById('stat-likes').textContent=fn(s.totalLikes);document.getElementById('stat-replies').textContent=fn(s.totalReplies);document.getElementById('stat-posts-badge').textContent='共 '+s.totalPosts+' 篇';document.getElementById('stat-views-badge').textContent='均 '+fn(s.avgViews)+'/篇';}
+function updFW(d){[['遊學','follower-play','follower-play-change'],['美加','follower-usca','follower-usca-change'],['英澳','follower-ukau','follower-ukau-change']].forEach(([k,el,cel])=>{const arr=d[k]||[];if(!arr.length){document.getElementById(el).textContent='—';return;}const lat=arr[arr.length-1].followers;document.getElementById(el).textContent=fn(lat);if(arr.length>=2){const prev=arr[arr.length-2].followers,diff=lat-prev;const ce=document.getElementById(cel);ce.textContent=(diff>=0?'▲ +':'▼ ')+fn(Math.abs(diff))+' 本月';ce.className='follower-change '+(diff>=0?'up':'down');}else{document.getElementById(cel).textContent='本月首筆';}});
+  const months=[...new Set([...(d['遊學']||[]).map(x=>x.month),...(d['美加']||[]).map(x=>x.month),...(d['英澳']||[]).map(x=>x.month)])].sort((a,b)=>a-b).map(m=>m+'月');
+  if(charts.fw)charts.fw.destroy();const ctx=document.getElementById('followersChart').getContext('2d');
+  charts.fw=new Chart(ctx,{type:'line',data:{labels:months,datasets:[{label:'遊學',data:(d['遊學']||[]).map(x=>x.followers),borderColor:'#2dd4a0',tension:.4,fill:false,pointRadius:3},{label:'美加',data:(d['美加']||[]).map(x=>x.followers),borderColor:'#4f7cff',tension:.4,fill:false,pointRadius:3},{label:'英澳',data:(d['英澳']||[]).map(x=>x.followers),borderColor:'#a78bfa',tension:.4,fill:false,pointRadius:3}]},options:co('line')});
+}
+function updTop3(d){const c=document.getElementById('top3-container');if(!d.top3||!d.top3.length){c.innerHTML='<div style="grid-column:span 3;text-align:center;padding:24px;color:var(--text-muted)">暫無數據</div>';return;}c.innerHTML=d.top3.map((p,i)=>`<div class="top3-card"><div class="top3-rank">#${i+1}</div><div class="post-meta" style="margin-bottom:6px"><span class="post-account-badge ${ab(p.account)}">${al(p.account)}</span><span class="post-date">${fd(p.timestamp)}</span></div><div class="top3-views">👁 ${fn(p.views)}</div><div class="top3-content">${eh(p.content)}</div><div class="top3-footer"><span class="topic-badge">${p.topic||'—'}</span><span style="font-size:10px;color:var(--text-muted)">互動率 ${p.engagement}%</span>${p.permalink?`<a href="${p.permalink}" target="_blank" style="font-size:10px;color:var(--accent)">查看↗</a>`:''}</div></div>`).join('');}
+
+// Charts
+function co(t){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8b93a8',font:{size:10,family:'Noto Sans TC'},boxWidth:10,padding:8}},tooltip:{backgroundColor:'#1a1e2a',borderColor:'#2e3547',borderWidth:1,titleColor:'#e8eaf0',bodyColor:'#8b93a8',titleFont:{size:11},bodyFont:{size:11}}},scales:t!=='doughnut'?{x:{ticks:{color:'#5a6275',font:{size:10}},grid:{color:'#252b3a'}},y:{ticks:{color:'#5a6275',font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v},grid:{color:'#252b3a'}}}:{}};}
+function initCharts(){
+  charts.trend=new Chart(document.getElementById('trendChart').getContext('2d'),{type:'bar',data:{labels:[],datasets:[{label:'瀏覽數',data:[],backgroundColor:'rgba(79,124,255,0.3)',borderColor:'#4f7cff',borderWidth:1,yAxisID:'y1'},{label:'發文篇數',data:[],type:'line',borderColor:'#2dd4a0',backgroundColor:'transparent',tension:.4,pointRadius:2,yAxisID:'y'}]},options:{...co('bar'),scales:{x:{ticks:{color:'#5a6275',font:{size:9},maxRotation:45},grid:{color:'#252b3a'}},y:{position:'left',ticks:{color:'#5a6275',font:{size:9}},grid:{color:'#252b3a'}},y1:{position:'right',ticks:{color:'#5a6275',font:{size:9},callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v},grid:{drawOnChartArea:false}}}}});
+  charts.topic=new Chart(document.getElementById('topicChart').getContext('2d'),{type:'doughnut',data:{labels:[],datasets:[{data:[],backgroundColor:['#4f7cff','#2dd4a0','#a78bfa','#f5c842','#fb923c','#ff5e7a','#34d399'],borderWidth:0}]},options:{...co('doughnut'),cutout:'65%',plugins:{legend:{position:'right',labels:{color:'#8b93a8',font:{size:10},boxWidth:8}}}}});
+  charts.tbar=new Chart(document.getElementById('topicBarChart').getContext('2d'),{type:'bar',data:{labels:[],datasets:[{label:'平均瀏覽',data:[],backgroundColor:'#4f7cff60',borderColor:'#4f7cff',borderWidth:1}]},options:co('bar')});
+  charts.monthly=new Chart(document.getElementById('monthlyChart').getContext('2d'),{type:'line',data:{labels:[],datasets:[]},options:co('line')});
+}
+function updTrend(d){charts.trend.data.labels=d.dates.map(x=>x.slice(5));charts.trend.data.datasets[0].data=d.views;charts.trend.data.datasets[1].data=d.counts;charts.trend.update();}
+function updTopic(d){charts.topic.data.labels=d.labels;charts.topic.data.datasets[0].data=d.data;charts.topic.data.datasets[0].backgroundColor=d.colors;charts.topic.update();}
+
+// Posts
+async function loadFOpts(){const o=await ag({action:'getFilterOptions'});if(!o)return;const s=document.getElementById('pf-topic');s.innerHTML='<option value="">全部主題</option>';(o.topics||[]).forEach(t=>{const op=document.createElement('option');op.value=t;op.textContent=t;s.appendChild(op);});}
+function debounce(fn,ms){clearTimeout(dTimer);dTimer=setTimeout(fn,ms);}
+async function loadPosts(){
+  const body=document.getElementById('post-body');body.innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-title">載入中...</div></div>';
+  const p={action:'getDashboardData'};
+  const a=document.getElementById('pf-account').value,t=document.getElementById('pf-topic').value,m=document.getElementById('pf-month').value,k=document.getElementById('pf-kw').value.trim();
+  if(a)p.account=a;if(t)p.topic=t;if(m)p.month=m;if(k)p.keyword=k;
+  const d=await ag(p);if(!d)return;allPosts=d.posts||[];
+  document.getElementById('post-count').textContent='共 '+allPosts.length+' 筆';
+  if(!allPosts.length){body.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">沒有符合條件的貼文</div></div>';return;}
+  body.innerHTML=allPosts.map(p=>{const eng=p.views>0?(((p.likes+p.replies+p.reposts)/p.views)*100).toFixed(1):'0.0';return`<div class="post-row" onclick="if(event.currentTarget.dataset.link)window.open(event.currentTarget.dataset.link,'_blank')" data-link="${p.permalink||''}"><div class="post-content-cell"><div class="post-content-text">${eh(p.content)}</div><div class="post-meta"><span class="post-account-badge ${ab(p.account)}">${al(p.account)}</span><span class="post-date">${fd(p.timestamp)}</span></div></div><div><span class="topic-badge">${p.topic||'—'}</span></div><div class="metric-cell">${fn(p.views)}</div><div class="metric-cell">${fn(p.likes)}</div><div class="metric-cell">${fn(p.replies)}</div><div class="metric-cell">${fn(p.reposts)}</div><div class="metric-cell">${eng}%</div></div>`;}).join('');}
+
+// Analytics
+async function loadAnalytics(){if(!API)return;const d=await ag({action:'getDashboardData'});if(!d||!d.posts)return;aiPosts=d.posts;const tm={};d.posts.forEach(p=>{const t=p.topic||'未分類';if(!tm[t])tm[t]={total:0,count:0};tm[t].total+=p.views;tm[t].count++;});const sorted=Object.entries(tm).sort((a,b)=>b[1].total/b[1].count-a[1].total/a[1].count);charts.tbar.data.labels=sorted.map(e=>e[0]);charts.tbar.data.datasets[0].data=sorted.map(e=>Math.round(e[1].total/e[1].count));charts.tbar.update();
+  const mm={};['遊學','美加','英澳'].forEach(g=>{mm[g]={};});d.posts.forEach(p=>{const mo=new Date(p.timestamp).getMonth()+1;const g=p.account==='tkbletsplay_'?'遊學':p.account==='tkbletsgo.usca'?'美加':'英澳';if(!mm[g][mo])mm[g][mo]=0;mm[g][mo]++;});const mos=Array.from({length:12},(_,i)=>i+1);const cls={'遊學':'#2dd4a0','美加':'#4f7cff','英澳':'#a78bfa'};charts.monthly.data.labels=mos.map(m=>m+'月');charts.monthly.data.datasets=Object.entries(mm).map(([g,data])=>({label:g,data:mos.map(m=>data[m]||0),borderColor:cls[g],backgroundColor:'transparent',tension:.4,pointRadius:3}));charts.monthly.update();}
+
+// AI Chat
+async function ensureCtx(){if(!aiStats)aiStats=await ag({action:'getStats'});if(!aiPosts){const d=await ag({action:'getDashboardData'});aiPosts=d?d.posts:[];}}
+async function askAI(q){document.getElementById('ai-input').value=q;await sendAI();}
+async function sendAI(){const inp=document.getElementById('ai-input');const q=inp.value.trim();if(!q)return;if(!GEM){toast('⚠️ 請先設定 Gemini API Key');return;}
+  const mc=document.getElementById('ai-messages');mc.innerHTML+=`<div class="ai-msg user">${eh(q)}</div>`;const lid='l'+Date.now();mc.innerHTML+=`<div class="ai-msg bot" id="${lid}">🤔 分析中...</div>`;mc.scrollTop=mc.scrollHeight;inp.value='';
+  await ensureCtx();
+  const tm={};(aiPosts||[]).forEach(p=>{const t=p.topic||'未分類';if(!tm[t])tm[t]={count:0,tv:0};tm[t].count++;tm[t].tv+=p.views;});
+  const ctx=`你是 TKB 放洋留遊學的 Threads 數據分析師。數據摘要：\n- 總貼文：${aiStats?.totalPosts||'未知'} 篇\n- 總瀏覽：${fn(aiStats?.totalViews||0)}\n- 平均瀏覽/篇：${fn(aiStats?.avgViews||0)}\n- 主題成效：\n${Object.entries(tm).map(([t,d])=>`  ${t}：${d.count}篇，均${Math.round(d.tv/d.count)}瀏覽`).join('\n')}\n\n請用繁體中文回答（200字內，語氣像社群顧問）：${q}`;
+  try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEM}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:ctx}]}],generationConfig:{temperature:.7,maxOutputTokens:500}})});const j=await r.json();const t=j.candidates?.[0]?.content?.parts?.[0]?.text||'分析失敗';document.getElementById(lid).innerHTML=t.replace(/\n/g,'<br>');}catch(e){document.getElementById(lid).textContent='❌ 失敗：'+e.message;}
+  mc.scrollTop=mc.scrollHeight;}
+
+// Copywriter
+let advOpen=false;
+function toggleAdv(){advOpen=!advOpen;document.getElementById('adv-panel').classList.toggle('open',advOpen);document.getElementById('adv-arrow').textContent=advOpen?'⌄':'›';}
+function setIT(t,el){document.querySelectorAll('.input-type-tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');}
+function clearCopy(){document.getElementById('copy-input').value='';document.getElementById('copy-out').style.display='none';document.getElementById('copy-out').value='';document.getElementById('copy-ph').style.display='flex';document.getElementById('ht-area').style.display='none';document.getElementById('sfc').classList.remove('show');document.getElementById('cc').textContent='尚未生成內容';document.getElementById('cr-btn').disabled=true;document.getElementById('tone-btn').disabled=true;document.getElementById('ver-tabs').innerHTML='<div class="version-tab active">小編語氣（去 AI 化）</div>';vers=[];hts=[];}
+async function genCopy(){
+  const inp=document.getElementById('copy-input').value.trim();
+  if(!inp){toast('⚠️ 請輸入內容');return;}
+  if(!GEM){toast('⚠️ 請先設定 Gemini API Key');return;}
+
+  const btn=document.getElementById('copy-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 生成中...';
+
+  const platform=document.getElementById('copy-platform').value;
+  const tone=document.getElementById('copy-tone').value;
+  const persona=document.getElementById('copy-persona').value;
+  const tc=document.getElementById('copy-tc').value;
+  const reply=document.getElementById('copy-reply').checked;
+  const ht=document.getElementById('copy-hashtags').checked;
+  const emojiDensity=parseInt(document.getElementById('copy-emoji').value||'2');
+  const listFormat=document.getElementById('copy-listfmt').value||'none';
+
+  const emojiLevel=emojiDensity===1?'極少 (僅在關鍵處點綴)':emojiDensity===2?'適中 (自然融入)':'豐富 (活潑強烈)';
+
+  let prompt=`請幫我將以下內容改寫為【${platform}】的貼文。\n`;
+  prompt+=`【品牌人設】：${persona||'無特定設定，請以一般客觀專業小編角度撰寫'}\n`;
+  prompt+=`【語氣設定】：${tone}\n`;
+  prompt+=`【Emoji 濃度】：${emojiLevel}\n`;
+
+  if(listFormat!=='none'){
+    prompt+=`【列表與排版要求】：若原始內容是一整段未排版的文字，請幫我梳理重點並加上編號。請務必使用「${listFormat}」作為項目符號，並確保每個項目獨立一行，項目之間有適當的換行（Line breaks），讓排版清晰易讀。\n`;
+  }else{
+    prompt+=`【列表與排版要求】：若原始內容是一整段未排版的文字，請幫我梳理重點並加上適當的項目符號。請確保每個項目獨立一行，讓排版清晰易讀。\n`;
+  }
+
+  if(platform==='Threads'){
+    prompt+=`\n【Threads 專屬要求】：\n`;
+    if(tc==='1'){
+      prompt+=`- 主文：請撰寫 1 篇完整的主文。\n`;
+    }else{
+      prompt+=`- 主文：這是一組 Threads 串文，請將主文拆分成 ${tc} 篇。每篇之間請用「\n\n---\n\n」分隔。\n`;
+    }
+    if(reply)prompt+=`- 回文：請在主文之後，額外撰寫 1-2 則「小編補充回文」，並清楚標註【回文】。\n`;
+  }
+
+  prompt+=`\n【原始草稿】：\n${inp}\n\n`;
+  prompt+=`請務必輸出 JSON 格式，包含兩個不同切入點的版本（例如：版本A-痛點放大、版本B-溫馨故事），以及 ${ht?'5-8個相關 Hashtags':'空的 hashtags 陣列'}。
+格式如下：
+{
+  "versions": [
+    { "title": "版本 A (切入點說明)", "content": "貼文內容..." },
+    { "title": "版本 B (切入點說明)", "content": "貼文內容..." }
+  ],
+  "hashtags": ["#tag1", "#tag2"]
+}`;
+
+  try{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEM}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        contents:[{parts:[{text:prompt}]}],
+        systemInstruction:{parts:[{text:SYSTEM_PROMPT}]},
+        generationConfig:{temperature:.8,maxOutputTokens:2000,responseMimeType:'application/json'}
+      })
+    });
+    const j=await res.json();
+    let tx=j.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+    tx=tx.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const r=JSON.parse(tx);
+    vers=r.versions||[];hts=r.hashtags||[];actVer=0;
+
+    if(vers.length){
+      const tabs=document.getElementById('ver-tabs');
+      tabs.innerHTML=vers.map((v,i)=>`<button class="version-tab ${i===0?'active':''}" onclick="swVer(${i})">${v.title}</button>`).join('');
+      const out=document.getElementById('copy-out');
+      out.value=vers[0].content;out.style.display='block';
+      document.getElementById('copy-ph').style.display='none';
+      updCC();
+      if(hts.length){
+        document.getElementById('ht-area').style.display='block';
+        document.getElementById('ht-list').innerHTML=hts.map(h=>`<span class="hashtag-chip">${h}</span>`).join('');
+      }
+      document.getElementById('cr-btn').disabled=false;
+      document.getElementById('tone-btn').disabled=false;
+      document.getElementById('sfc').classList.add('show');
+      toast('✅ 文案生成完成！');
+    }
+  }catch(e){toast('❌ 生成失敗：'+e.message);}
+  btn.disabled=false;btn.innerHTML='✨ 執行去 AI 化（產出雙版本）';
+}
+function swVer(i){actVer=i;document.querySelectorAll('.version-tab').forEach((t,j)=>t.classList.toggle('active',i===j));document.getElementById('copy-out').value=vers[i].content;updCC();}
+function updCC(){const v=vers[actVer]?.content||document.getElementById('copy-out').value;document.getElementById('cc').textContent='字數：'+v.length+' 字';}
+function cpRes(){navigator.clipboard.writeText(document.getElementById('copy-out').value).then(()=>toast('✅ 已複製'));}
+function copyHT(){navigator.clipboard.writeText(hts.join(' ')).then(()=>toast('✅ Hashtags 已複製'));}
+async function chkTone(){
+  if(!GEM||!vers.length)return;
+  const btn=document.getElementById('tone-btn');
+  btn.disabled=true;btn.innerHTML='⏳ 檢測中...';
+  const content=vers[actVer].content;
+  try{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEM}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        contents:[{parts:[{text:`請以專業社群編輯的角度，檢測以下文案的「人味指數」（是否像真人寫的，還是有濃厚的 AI 機器人味）。\n請給出 1 到 100 的評分（100 分代表完全像真人，0 分代表非常生硬的 AI 味）。\n並給出簡短的分析（50字內）以及 1-2 個具體的修改建議。\n\n請務必只回傳 JSON 格式：\n{"score":85,"analysis":"語氣自然，但部分轉折詞略顯生硬。","suggestions":["將『總而言之』改為直接刪除","結尾可以多加互動問句"]}\n\n文案內容：\n${content}`}]}],
+        generationConfig:{temperature:.2,maxOutputTokens:200,responseMimeType:'application/json'}
+      })
+    });
+    const j=await res.json();
+    const t=JSON.parse(j.candidates?.[0]?.content?.parts?.[0]?.text||'{}');
+    const color=t.score>=80?'var(--green)':t.score>=60?'var(--yellow)':'var(--red)';
+    const sugs=(t.suggestions||[]).map(s=>`<li style="margin-top:4px">• ${s}</li>`).join('');
+    toast(`人味指數：${t.score}/100 — ${t.analysis}`);
+
+    // 顯示詳細結果在輸出區下方
+    let resultEl=document.getElementById('tone-result');
+    if(!resultEl){
+      resultEl=document.createElement('div');
+      resultEl.id='tone-result';
+      resultEl.style.cssText='padding:12px 14px;background:var(--bg-elevated);border-top:1px solid var(--border);font-size:12px;flex-shrink:0;';
+      document.getElementById('copy-out').closest('.copy-output-card').insertBefore(resultEl, document.getElementById('ht-area'));
+    }
+    resultEl.innerHTML=`<div style="display:flex;align-items:flex-start;gap:10px"><div style="text-align:center;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:64px;flex-shrink:0"><div style="font-size:9px;font-weight:600;color:var(--text-muted);margin-bottom:4px">人味指數</div><div style="font-size:22px;font-weight:900;color:${color};font-family:var(--font-mono)">${t.score}</div><div style="font-size:9px;color:var(--text-muted)">/100</div></div><div style="flex:1"><p style="color:var(--text-primary);line-height:1.5;margin-bottom:6px">💡 ${t.analysis}</p><ul style="color:var(--text-secondary);list-style:none;padding:0">${sugs}</ul></div><button onclick="document.getElementById('tone-result').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:0 4px">×</button></div>`;
+  }catch(e){toast('❌ 語氣檢測失敗：'+e.message);}
+  btn.disabled=false;btn.innerHTML='📊 語氣檢測';
+}
+function toSched(){const c=vers[actVer]?.content;if(!c)return;document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-schedule').classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.page==='schedule'));setTimeout(()=>{document.getElementById('sc').value=c;toast('✅ 文案已帶入排程表單');},100);}
+
+// Schedule
+async function submitSched(){const account=document.getElementById('sa').value,time=document.getElementById('st').value,content=document.getElementById('sc').value.trim();if(!content){toast('⚠️ 請輸入主文內容');return;}if(!time){toast('⚠️ 請設定發布時間');return;}const schedTime=new Date(time),now=new Date();if(schedTime<=now){const r=await ap({action:'createPost',data:{account,content,topic:document.getElementById('stopic').value}});if(r?.data?.success){toast('✅ 貼文已立即發布！');}else{toast('❌ 發布失敗：'+(r?.data?.message||'未知'));}}else{toast('📅 排程功能請確認 GAS 時間觸發器已設定');}}
+
+// Utils
+function fn(n){if(n==null)return'0';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return n.toString();}
+function fd(ts){if(!ts)return'';const d=new Date(ts);if(isNaN(d))return'';return(d.getMonth()+1)+'/'+(d.getDate());}
+function eh(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function al(a){return a==='tkbletsplay_'?'遊學':a==='tkbletsgo.usca'?'美加':'英澳';}
+function ab(a){return a==='tkbletsplay_'?'badge-play':a==='tkbletsgo.usca'?'badge-usca':'badge-ukau';}
+let _tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),3500);}
+</script>
+</body>
+</html>
