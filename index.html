@@ -974,11 +974,11 @@ function renderHeatmap() {
   }
 
   const metricKeys = {
-    views:   { slots:['v1H','v24H','v3D','v7D'],   total:'views'   },
-    likes:   { slots:['l1H','l24H','l3D','l7D'],   total:'likes'   },
+    views:   { slots:['v1H','v24H','v3D','v7D'],     total:'views'   },
+    likes:   { slots:['l1H','l24H','l3D','l7D'],     total:'likes'   },
     replies: { slots:['rl1H','rl24H','rl3D','rl7D'], total:'replies' },
     reposts: { slots:['rp1H','rp24H','rp3D','rp7D'], total:'reposts' },
-    quotes:  { slots:['q1H','q24H','q3D','q7D'],   total:'quotes'  }
+    quotes:  { slots:['q1H','q24H','q3D','q7D'],     total:'quotes'  }
   };
   const hasKeys = ['has1H','has24H','has3D','has7D'];
   const { slots, total } = metricKeys[hmMetric] || metricKeys.views;
@@ -1023,46 +1023,6 @@ function renderHeatmap() {
       </div>
       ${slots.map((k, i) => cell(p[k] || 0, p[hasKeys[i]])).join('')}
       <div class="hm-cell" style="background:rgba(${r},${g},${b},${tAlpha});color:${tTxt};font-weight:600" title="${totalVal}">${tDisp}</div>
-    </div>`;
-  }).join('');
-}
-
-  // 計算各欄最大值（用於顏色深度計算）
-  const maxVals = { v1H: 1, v24H: 1, v3D: 1, v7D: 1, vTotal: 1 };
-  hmData.forEach(p => {
-    maxVals.v1H    = Math.max(maxVals.v1H,    p.v1H    || 0);
-    maxVals.v24H   = Math.max(maxVals.v24H,   p.v24H   || 0);
-    maxVals.v3D    = Math.max(maxVals.v3D,    p.v3D    || 0);
-    maxVals.v7D    = Math.max(maxVals.v7D,    p.v7D    || 0);
-    maxVals.vTotal = Math.max(maxVals.vTotal, p.vTotal || 0);
-  });
-
-  // 帳號色系
-  const accentColors = {
-    'tkbletsplay_':   [154, 126, 208],  // 紫
-    'tkbletsgo.usca': [118, 200, 167],  // 綠
-    'tkbletsgo.ukau': [255, 165, 52]    // 黃
-  };
-  const defaultColor = [79, 124, 255];
-
-  body.innerHTML = hmData.slice(0, 80).map(p => {
-    const [r, g, b] = accentColors[p.account] || defaultColor;
-    function cell(val, max) {
-      const ratio = max > 0 ? Math.min(val / max, 1) : 0;
-      const alpha = ratio < 0.05 ? 0.05 : ratio;
-      const textColor = ratio > 0.5 ? '#fff' : `rgb(${r},${g},${b})`;
-      const display = val >= 1000 ? (val/1000).toFixed(1)+'K' : (val || '—');
-      return `<div class="hm-cell" style="background:rgba(${r},${g},${b},${alpha});color:${textColor}" title="${val}">${display}</div>`;
-    }
-    return `<div class="hm-row">
-      <div class="hm-label" title="${p.content}">
-        <span style="font-size:9px;color:${`rgb(${(accentColors[p.account]||defaultColor).join(',')})`};font-weight:700;margin-right:4px">${al(p.account)}</span>${eh(p.content)}
-      </div>
-      ${cell(p.v1H,    maxVals.v1H)}
-      ${cell(p.v24H,   maxVals.v24H)}
-      ${cell(p.v3D,    maxVals.v3D)}
-      ${cell(p.v7D,    maxVals.v7D)}
-      ${cell(p.vTotal, maxVals.vTotal)}
     </div>`;
   }).join('');
 }
