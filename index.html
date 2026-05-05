@@ -81,11 +81,11 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
 .filter-select{cursor:pointer}.filter-select:focus,.filter-input:focus{border-color:var(--accent)}
 .filter-input::placeholder{color:var(--text-muted)}.filter-input{flex:1;min-width:200px}
 .post-table{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
-.post-table-header,.post-row{display:grid;grid-template-columns:2fr 1fr 80px 80px 80px 80px 100px;padding:10px 16px;align-items:center}
+.post-table-header,.post-row{display:grid;grid-template-columns:200px 100px 80px 70px 70px 70px 80px 90px;padding:10px 16px;align-items:center}
 .post-table-header{background:var(--bg-elevated);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase}
-.post-row{border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer;padding:12px 16px}
+.post-row{border-bottom:1px solid var(--border);transition:background .1s;padding:10px 16px}
 .post-row:last-child{border-bottom:none}.post-row:hover{background:var(--bg-hover)}
-.post-content-text{font-size:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+
 .post-meta{display:flex;align-items:center;gap:6px;margin-top:3px}
 .post-account-badge{font-size:10px;padding:1px 6px;border-radius:99px;font-weight:600}
 .badge-play{background:var(--purple-soft);color:var(--purple)}.badge-usca{background:var(--accent-soft);color:var(--accent)}.badge-ukau{background:var(--purple-soft);color:var(--purple)}
@@ -188,6 +188,9 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
 .cta-status-sel.cta-done{background:var(--green-soft);color:var(--green);border-color:rgba(118,200,167,.3)}
 .cta-status-sel.cta-pending{background:var(--yellow-soft);color:var(--yellow);border-color:rgba(255,165,52,.3)}
 .cta-status-sel.cta-none{background:var(--bg-elevated);color:var(--text-muted)}
+.post-expand{animation:expandIn .18s ease}
+@keyframes expandIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.post-content-text{font-size:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-primary);padding:10px 18px;border-radius:99px;font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:all .25s;white-space:nowrap;display:flex;align-items:center;gap:7px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
@@ -292,7 +295,7 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
       <input class="filter-input" type="text" id="pf-kw" placeholder="🔍 搜尋貼文內容..." oninput="debounce(loadPosts,400)">
     </div>
     <div class="post-table">
-      <div class="post-table-header"><div>內容</div><div>主題</div><div>瀏覽</div><div>愛心</div><div>留言</div><div>轉發</div><div>互動率</div></div>
+      <div class="post-table-header"><div>內容</div><div>主題</div><div>瀏覽</div><div>愛心</div><div>留言</div><div>轉發</div><div>互動率</div><div>CTA 狀態</div></div>
       <div class="post-table-body" id="post-body"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">請設定 API URL</div></div></div>
     </div>
     <div style="margin-top:10px;font-size:11px;color:var(--text-muted);text-align:right" id="post-count"></div>
@@ -728,9 +731,12 @@ async function loadPosts(){
     const eng=p.views>0?(((p.likes+p.replies+p.reposts)/p.views)*100).toFixed(1):'0.0';
     const ctaSt=p.ctaStatus||'不發送';
     const ctaSelClass=ctaSt==='已發送'?'cta-done':ctaSt==='待發送'?'cta-pending':'cta-none';
-    return`<div class="post-row" style="grid-template-columns:2fr 1fr 80px 80px 80px 80px 90px 90px;cursor:default">
-      <div class="post-content-cell" onclick="if('${p.permalink||''}')window.open('${p.permalink||''}','_blank')" style="cursor:${p.permalink?'pointer':'default'}">
-        <div class="post-content-text">${eh(p.content)}</div>
+    return`<div class="post-row" id="row-${p.postId}">
+      <div class="post-content-cell" onclick="toggleExpand('${p.postId}')" style="cursor:pointer">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px">
+          <div class="post-content-text" style="flex:1">${eh(p.content)}</div>
+          ${p.permalink?`<a href="${p.permalink}" target="_blank" onclick="event.stopPropagation()" style="color:var(--accent);font-size:11px;flex-shrink:0;padding:1px 2px;line-height:1;text-decoration:none" title="在 Threads 查看">↗</a>`:''}
+        </div>
         <div class="post-meta"><span class="post-account-badge ${ab(p.account)}">${al(p.account)}</span><span class="post-date">${fd(p.timestamp)}</span></div>
       </div>
       <div onclick="quickEditTopic('${p.postId}','${p.topic||''}',this)" style="cursor:pointer" title="點擊快速編輯主題"><span class="topic-badge">${p.topic||'—'}</span></div>
@@ -745,6 +751,17 @@ async function loadPosts(){
           <option value="待發送" ${ctaSt==='待發送'?'selected':''}>⏳ 待發送</option>
           <option value="已發送" ${ctaSt==='已發送'?'selected':''}>✅ 已發送</option>
         </select>
+      </div>
+    </div>
+    <div class="post-expand" id="expand-${p.postId}" style="display:none;grid-column:1/-1;padding:12px 16px 14px;background:var(--bg-elevated);border-bottom:1px solid var(--border);border-top:1px solid var(--border-light)">
+      <div style="font-size:12px;color:var(--text-primary);line-height:1.8;white-space:pre-wrap;margin-bottom:10px">${eh(p.content)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="post-meta">
+          <span class="post-account-badge ${ab(p.account)}">${al(p.account)}</span>
+          <span class="post-date">${fd(p.timestamp)}</span>
+          ${p.topic?`<span class="topic-badge" style="font-size:10px">${p.topic}</span>`:''}
+        </div>
+        ${p.permalink?`<a href="${p.permalink}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--accent);text-decoration:none;padding:5px 10px;background:var(--accent-soft);border:1px solid rgba(79,124,255,.2);border-radius:6px" title="在 Threads 查看原文">在 Threads 查看 ↗</a>`:''}
       </div>
     </div>`;}).join('');}
 
@@ -1280,6 +1297,38 @@ async function quickEditTopic(postId, currentTopic, cellEl) {
 
   sel.addEventListener('blur', confirm);
   sel.addEventListener('change', confirm);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 貼文列展開/收合
+// ══════════════════════════════════════════════════════════════
+let expandedPostId = null;
+
+function toggleExpand(postId) {
+  const expandEl = document.getElementById('expand-' + postId);
+  const rowEl = document.getElementById('row-' + postId);
+  if (!expandEl) return;
+
+  // 收合上一個展開的列
+  if (expandedPostId && expandedPostId !== postId) {
+    const prevExpand = document.getElementById('expand-' + expandedPostId);
+    const prevRow = document.getElementById('row-' + expandedPostId);
+    if (prevExpand) prevExpand.style.display = 'none';
+    if (prevRow) prevRow.style.background = '';
+  }
+
+  const isOpen = expandEl.style.display !== 'none';
+  if (isOpen) {
+    expandEl.style.display = 'none';
+    if (rowEl) rowEl.style.background = '';
+    expandedPostId = null;
+  } else {
+    expandEl.style.display = 'block';
+    if (rowEl) rowEl.style.background = 'var(--bg-hover)';
+    expandedPostId = postId;
+    // 捲動到可視區域
+    expandEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 }
 
 let _tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),3500);}
