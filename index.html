@@ -973,6 +973,60 @@ function renderHeatmap() {
     return;
   }
 
+  const metricKeys = {
+    views:   { slots:['v1H','v24H','v3D','v7D'],   total:'views'   },
+    likes:   { slots:['l1H','l24H','l3D','l7D'],   total:'likes'   },
+    replies: { slots:['rl1H','rl24H','rl3D','rl7D'], total:'replies' },
+    reposts: { slots:['rp1H','rp24H','rp3D','rp7D'], total:'reposts' },
+    quotes:  { slots:['q1H','q24H','q3D','q7D'],   total:'quotes'  }
+  };
+  const hasKeys = ['has1H','has24H','has3D','has7D'];
+  const { slots, total } = metricKeys[hmMetric] || metricKeys.views;
+
+  // 計算最大值
+  let maxVal = 1;
+  hmData.forEach(p => {
+    slots.forEach(k => { if (p[k]) maxVal = Math.max(maxVal, p[k]); });
+    if (p[total]) maxVal = Math.max(maxVal, p[total]);
+  });
+
+  const accentColors = {
+    'tkbletsplay_':   [154, 126, 208],
+    'tkbletsgo.usca': [118, 200, 167],
+    'tkbletsgo.ukau': [255, 165, 52]
+  };
+  const defaultColor = [79, 124, 255];
+
+  body.innerHTML = hmData.slice(0, 80).map(p => {
+    const [r, g, b] = accentColors[p.account] || defaultColor;
+
+    function cell(val, hasData) {
+      if (!hasData) {
+        return `<div class="hm-cell" style="background:var(--bg-elevated);color:var(--text-muted)">—</div>`;
+      }
+      const ratio = maxVal > 0 ? Math.min(val / maxVal, 1) : 0;
+      const alpha = Math.max(ratio * 0.85 + 0.08, 0.05);
+      const textColor = ratio > 0.5 ? '#fff' : `rgb(${r},${g},${b})`;
+      const display = val >= 1000 ? (val/1000).toFixed(1)+'K' : (val || '0');
+      return `<div class="hm-cell" style="background:rgba(${r},${g},${b},${alpha});color:${textColor}" title="${val}">${display}</div>`;
+    }
+
+    const totalVal = p[total] || 0;
+    const tRatio = maxVal > 0 ? Math.min(totalVal / maxVal, 1) : 0;
+    const tAlpha = Math.max(tRatio * 0.85 + 0.08, 0.05);
+    const tTxt = tRatio > 0.5 ? '#fff' : `rgb(${r},${g},${b})`;
+    const tDisp = totalVal >= 1000 ? (totalVal/1000).toFixed(1)+'K' : (totalVal || '0');
+
+    return `<div class="hm-row">
+      <div class="hm-label" title="${p.content}">
+        <span style="font-size:9px;color:rgb(${r},${g},${b});font-weight:700;margin-right:4px">${al(p.account)}</span>${eh(p.content)}
+      </div>
+      ${slots.map((k, i) => cell(p[k] || 0, p[hasKeys[i]])).join('')}
+      <div class="hm-cell" style="background:rgba(${r},${g},${b},${tAlpha});color:${tTxt};font-weight:600" title="${totalVal}">${tDisp}</div>
+    </div>`;
+  }).join('');
+}
+
   // 計算各欄最大值（用於顏色深度計算）
   const maxVals = { v1H: 1, v24H: 1, v3D: 1, v7D: 1, vTotal: 1 };
   hmData.forEach(p => {
