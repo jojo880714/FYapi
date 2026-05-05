@@ -697,6 +697,54 @@ window.addEventListener('DOMContentLoaded',()=>{
   // 頁面切換由 navTo() 全域函式處理
 });
 
+// ══════════════════════════════════════════════════════════════
+// 圖表初始化
+// ══════════════════════════════════════════════════════════════
+function initCharts() {
+  const isLight = document.body.classList.contains('light-mode');
+  const textSec = isLight ? '#6B6B6B' : '#A0A0A0';
+  const gridCol = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+
+  // 發文趨勢圖
+  const trendCtx = document.getElementById('trendChart').getContext('2d');
+  charts.trend = new Chart(trendCtx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: '總瀏覽', data: [], borderColor: '#7C6BC4', backgroundColor: 'rgba(124,107,196,0.1)', tension: 0.4, fill: true, yAxisID: 'y' },
+        { label: '發文篇數', data: [], borderColor: '#76C8A7', backgroundColor: 'transparent', tension: 0.4, fill: false, yAxisID: 'y1', borderDash: [4,3] }
+      ]
+    },
+    options: { ...co('line'), scales: { y: { position:'left', ticks:{color:textSec,font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v}, grid:{color:gridCol} }, y1: { position:'right', ticks:{color:textSec,font:{size:10}}, grid:{display:false} }, x: { ticks:{color:textSec,font:{size:10}}, grid:{color:gridCol} } } }
+  });
+
+  // 主題分布圖
+  const topicCtx = document.getElementById('topicChart').getContext('2d');
+  charts.topic = new Chart(topicCtx, {
+    type: 'doughnut',
+    data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 2, borderColor: isLight ? '#fff' : '#2C2C2E' }] },
+    options: co('doughnut')
+  });
+
+  // 主題平均瀏覽柱狀圖（AI分析頁）
+  const tbarCtx = document.getElementById('topicBarChart').getContext('2d');
+  charts.tbar = new Chart(tbarCtx, {
+    type: 'bar',
+    data: { labels: [], datasets: [{ label: '平均瀏覽', data: [], backgroundColor: 'rgba(124,107,196,0.7)', borderRadius: 4 }] },
+    options: co('bar')
+  });
+
+  // 月度發文折線圖（AI分析頁）
+  const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+  charts.monthly = new Chart(monthlyCtx, {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: co('line')
+  });
+}
+
+
 // API
 async function ag(p){if(!API){toast('⚠️ 請先設定 GAS API URL');return null;}const u=new URL(API);Object.entries(p).forEach(([k,v])=>u.searchParams.set(k,v));try{const r=await fetch(u.toString());const j=await r.json();if(j.success===false)throw new Error(j.message);return j.data!==undefined?j.data:j;}catch(e){toast('❌ '+e.message);return null;}}
 async function ap(b){if(!API){toast('⚠️ 請先設定 GAS API URL');return null;}try{const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return await r.json();}catch(e){toast('❌ '+e.message);return null;}}
