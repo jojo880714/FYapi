@@ -233,19 +233,19 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
   </div>
   <div class="sidebar-section">
     <div class="sidebar-section-label">數據分析</div>
-    <div class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span><span>總覽 Dashboard</span></div>
-    <div class="nav-item" data-page="posts"><span class="nav-icon">📋</span><span>貼文管理</span></div>
-    <div class="nav-item" data-page="analytics"><span class="nav-icon">🤖</span><span>AI 數據分析</span></div>
+    <div class="nav-item active" data-page="dashboard" onclick="navTo('dashboard',this)"><span class="nav-icon">📊</span><span>總覽 Dashboard</span></div>
+    <div class="nav-item" data-page="posts" onclick="navTo('posts',this)"><span class="nav-icon">📋</span><span>貼文管理</span></div>
+    <div class="nav-item" data-page="analytics" onclick="navTo('analytics',this)"><span class="nav-icon">🤖</span><span>AI 數據分析</span></div>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-section-label">內容操作</div>
-    <div class="nav-item" data-page="copywriter"><span class="nav-icon">✍️</span><span>文案產生器</span></div>
-    <div class="nav-item" data-page="schedule"><span class="nav-icon">📅</span><span>排程發文</span></div>
+    <div class="nav-item" data-page="copywriter" onclick="navTo('copywriter',this)"><span class="nav-icon">✍️</span><span>文案產生器</span></div>
+    <div class="nav-item" data-page="schedule" onclick="navTo('schedule',this)"><span class="nav-icon">📅</span><span>排程發文</span></div>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-section-label">系統</div>
-    <div class="nav-item" data-page="cta"><span class="nav-icon">🔔</span><span>CTA 資料庫</span></div>
-    <div class="nav-item" data-page="system"><span class="nav-icon">⚙️</span><span>系統設定</span></div>
+    <div class="nav-item" data-page="cta" onclick="navTo('cta',this)"><span class="nav-icon">🔔</span><span>CTA 資料庫</span></div>
+    <div class="nav-item" data-page="system" onclick="navTo('system',this)"><span class="nav-icon">⚙️</span><span>系統設定</span></div>
   </div>
   <div class="sidebar-footer">
     <!-- 深淺模式切換 -->
@@ -418,7 +418,7 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
     </div>
   </div>
   <div class="page-content" style="padding-top:16px">
-    <div class="copy-layout" id="copy-gen-layout">
+    <div class="copy-layout" id="copy-gen-layout" style="display:grid">
       <div class="copy-panel">
         <div class="copy-control-card">
           <div class="profile-select-bar">
@@ -693,25 +693,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   initTheme();
   if(API){loadDash();loadFOpts();}
   refreshTemplateSelect();
-  // 頁面切換時觸發對應載入
-  document.querySelectorAll('.nav-item').forEach(el=>{
-    el.addEventListener('click',()=>{
-      const pg=el.dataset.page;
-      if(pg==='cta' && API) loadCTARules();
-      if(pg==='posts' && API) { loadHeatmap(); }
-    });
-  });
-  document.querySelectorAll('.nav-item').forEach(el=>{
-    el.addEventListener('click',()=>{
-      const pg=el.dataset.page;
-      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-      document.getElementById('page-'+pg).classList.add('active');
-      el.classList.add('active');
-      if(pg==='posts'&&allPosts.length===0)loadPosts();
-      if(pg==='analytics')loadAnalytics();
-    });
-  });
+  // 頁面切換由 navTo() 全域函式處理
 });
 
 // API
@@ -865,15 +847,7 @@ async function genCopy(){
   }
 
   prompt+=`\n【原始草稿】：\n${inp}\n\n`;
-  prompt+=`請務必輸出 JSON 格式，包含兩個不同切入點的版本（例如：版本A-痛點放大、版本B-溫馨故事），以及 ${ht?'5-8個相關 Hashtags':'空的 hashtags 陣列'}。
-格式如下：
-{
-  "versions": [
-    { "title": "版本 A (切入點說明)", "content": "貼文內容..." },
-    { "title": "版本 B (切入點說明)", "content": "貼文內容..." }
-  ],
-  "hashtags": ["#tag1", "#tag2"]
-}`;
+  prompt+=`請務必輸出 JSON 格式，包含兩個不同切入點的版本和 ${ht?'5-8個':'0個'} Hashtags。格式：{"versions":[{"title":"版本A（切入點）","content":"貼文內容"},{"title":"版本B（切入點）","content":"貼文內容"}],"hashtags":["#tag1"]}`;
 
   try{
     const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEM}`,{
@@ -881,14 +855,23 @@ async function genCopy(){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         contents:[{parts:[{text:prompt}]}],
-        systemInstruction:{parts:[{text:SYSTEM_PROMPT}]},
+        system_instruction:{parts:[{text:SYSTEM_PROMPT}]},
         generationConfig:{temperature:.8,maxOutputTokens:2000,responseMimeType:'application/json'}
       })
     });
     const j=await res.json();
     let tx=j.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
     tx=tx.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    const r=JSON.parse(tx);
+    // 移除可能的控制字元
+    tx=tx.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');
+    let r;
+    try{ r=JSON.parse(tx); }
+    catch(parseErr){
+      // 嘗試找到 JSON 物件
+      const match=tx.match(/\{[\s\S]*\}/);
+      if(match) r=JSON.parse(match[0]);
+      else throw new Error('JSON 解析失敗：'+parseErr.message);
+    }
     vers=r.versions||[];hts=r.hashtags||[];actVer=0;
 
     if(vers.length){
@@ -1121,11 +1104,16 @@ async function deleteCTA(rowIndex) {
 // 文案產生器 tab 切換
 // ══════════════════════════════════════════════════════════════
 function setCopyTab(tab, el) {
+  // 更新 tab 按鈕
   document.querySelectorAll('.copy-tab-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('copy-gen-layout').style.display = tab === 'gen' ? 'grid' : 'none';
-  document.getElementById('copy-lib-panel').style.display  = tab === 'lib'  ? 'block' : 'none';
-  document.getElementById('copy-hist-panel').style.display = tab === 'hist' ? 'block' : 'none';
+  if(el) el.classList.add('active');
+  // 更新內容區
+  const genEl  = document.getElementById('copy-gen-layout');
+  const libEl  = document.getElementById('copy-lib-panel');
+  const histEl = document.getElementById('copy-hist-panel');
+  if(genEl)  { genEl.style.cssText  = tab==='gen'  ? 'display:grid'  : 'display:none'; }
+  if(libEl)  { libEl.style.cssText  = tab==='lib'  ? 'display:block' : 'display:none'; }
+  if(histEl) { histEl.style.cssText = tab==='hist' ? 'display:block' : 'display:none'; }
   if (tab === 'lib')  renderTemplates();
   if (tab === 'hist') renderHistory();
 }
@@ -1392,6 +1380,21 @@ function setTheme(mode) {
 function initTheme() {
   const saved = localStorage.getItem('theme') || 'dark';
   setTheme(saved);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 頁面導覽（全域函式，直接從 onclick 呼叫）
+// ══════════════════════════════════════════════════════════════
+function navTo(pg, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pageEl = document.getElementById('page-' + pg);
+  if (pageEl) pageEl.classList.add('active');
+  if (el) el.classList.add('active');
+  if (pg === 'posts' && allPosts.length === 0) loadPosts();
+  if (pg === 'analytics') loadAnalytics();
+  if (pg === 'cta' && API) loadCTARules();
+  if (pg === 'posts' && API) loadHeatmap();
 }
 
 let _tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),3500);}
