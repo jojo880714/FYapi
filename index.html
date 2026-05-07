@@ -409,7 +409,7 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
     <div class="page-header-inner">
       <div>
         <div class="page-title">📊 數據洞察</div>
-        <div class="page-subtitle">主題平均瀏覽 · 月度發文趨勢</div>
+        <div class="page-subtitle">指標總覽 · 主題分析 · 發文時間 · 月度趨勢</div>
       </div>
     </div>
     <div style="margin-top:14px">
@@ -422,6 +422,36 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
     </div>
   </div>
   <div class="page-content">
+
+    <!-- ① Threads 指標卡片 -->
+    <div id="a2-metrics-loading" style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">載入指標中...</div>
+    <div id="a2-metrics-grid" style="display:none;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px">
+      <div class="stat-card blue" id="mc-engage-rate">
+        <div class="stat-label">💬 互動率</div>
+        <div class="stat-value" id="mc-engage-rate-val">—</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">（愛心+留言+轉發）÷ 瀏覽</div>
+      </div>
+      <div class="stat-card green" id="mc-reply-rate">
+        <div class="stat-label">💬 留言率</div>
+        <div class="stat-value" id="mc-reply-rate-val">—</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">留言 ÷ 瀏覽</div>
+      </div>
+      <div class="stat-card purple" id="mc-repost-rate">
+        <div class="stat-label">🔁 轉發率</div>
+        <div class="stat-value" id="mc-repost-rate-val">—</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">轉發 ÷ 瀏覽</div>
+      </div>
+      <div class="stat-card red" id="mc-avg-engage">
+        <div class="stat-label">⚡ 平均互動</div>
+        <div class="stat-value" id="mc-avg-engage-val">—</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">總互動 ÷ 發文數</div>
+      </div>
+      <div class="stat-card blue" id="mc-viral-rate">
+        <div class="stat-label">🚀 爆款率</div>
+        <div class="stat-value" id="mc-viral-rate-val">—</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">瀏覽 &gt; 均值 2x 的比例</div>
+      </div>
+    </div>
 
     <!-- 主題平均瀏覽柱狀圖 -->
     <div class="chart-card" style="margin-bottom:16px">
@@ -436,6 +466,35 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
         <canvas id="chart-topic-avg"></canvas>
       </div>
       <div id="a2-topic-meta" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+
+    <!-- ② 發文時間熱圖 -->
+    <div class="chart-card" style="margin-bottom:16px">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">🕐 發文時間熱圖</div>
+          <div class="chart-subtitle">哪個時段發文效果最好</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <div style="display:flex;gap:4px;background:var(--bg-elevated);padding:3px;border-radius:8px;border:1px solid var(--border)">
+            <button class="hm-metric-btn active" id="th-btn-views" onclick="switchTimeHeatMode('views',this)">平均瀏覽</button>
+            <button class="hm-metric-btn" id="th-btn-count" onclick="switchTimeHeatMode('count',this)">發文篇數</button>
+          </div>
+        </div>
+      </div>
+      <div id="a2-timeheat-loading" style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px">載入中...</div>
+      <div id="a2-timeheat-wrap" style="display:none;overflow-x:auto">
+        <!-- 表頭：星期 -->
+        <div style="display:grid;grid-template-columns:36px repeat(7,1fr);gap:3px;margin-bottom:3px;padding:0 4px" id="th-header"></div>
+        <!-- 熱圖主體 -->
+        <div id="th-body" style="display:flex;flex-direction:column;gap:3px;padding:0 4px"></div>
+        <!-- 圖例 -->
+        <div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:0 4px;justify-content:flex-end">
+          <span style="font-size:10px;color:var(--text-muted)">低</span>
+          <div id="th-legend" style="display:flex;gap:2px"></div>
+          <span style="font-size:10px;color:var(--text-muted)">高</span>
+        </div>
+      </div>
     </div>
 
     <!-- 月度發文折線圖 -->
@@ -1507,12 +1566,14 @@ function navTo(pg, el) {
 let _tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),3500);}
 
 // ══════════════════════════════════════════════════════════════
-// Phase 2 — 有數據分析頁
+// Phase 2 — 數據洞察頁
 // ══════════════════════════════════════════════════════════════
 
 let a2CurrentAccount = '';
 let chartTopicAvg    = null;
 let chartMonthly     = null;
+let a2Posts          = [];   // 共用資料快取
+let timeHeatMode     = 'views'; // 'views' | 'count'
 
 function switchA2Tab(account, el) {
   document.querySelectorAll('#a2-tabs .account-tab').forEach(b => b.classList.remove('active'));
@@ -1521,106 +1582,235 @@ function switchA2Tab(account, el) {
   loadAnalytics2();
 }
 
-async function loadAnalytics2() {
-  if (!API) { toast('⚠️ 請先設定 GAS API URL'); return; }
-  loadTopicAvg();
-  loadMonthlyTrend();
+function switchTimeHeatMode(mode, el) {
+  timeHeatMode = mode;
+  document.querySelectorAll('#th-btn-views,#th-btn-count').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderTimeHeatmap(a2Posts);
 }
 
-async function loadTopicAvg() {
+// 主入口：一次拿資料，分發給各子函式
+async function loadAnalytics2() {
+  if (!API) { toast('⚠️ 請先設定 GAS API URL'); return; }
+
+  // 顯示 loading
+  const mLoading = document.getElementById('a2-metrics-loading');
+  const mGrid    = document.getElementById('a2-metrics-grid');
+  if (mLoading) { mLoading.style.display = 'block'; mLoading.textContent = '載入指標中...'; }
+  if (mGrid)    mGrid.style.display = 'none';
+
+  // 一次 API 拿所有貼文
+  const params = { action: 'getDashboardData' };
+  if (a2CurrentAccount) params.account = a2CurrentAccount;
+  const res = await ag(params);
+  if (!res || !res.posts) {
+    if (mLoading) mLoading.textContent = '載入失敗，請確認 API 連線';
+    return;
+  }
+  a2Posts = res.posts || [];
+
+  // 分發給各子函式（共用同一份資料，不重複打 API）
+  renderMetricCards(a2Posts);
+  renderTopicAvg(a2Posts);
+  renderTimeHeatmap(a2Posts);
+  loadMonthlyTrend(); // 月度趨勢用獨立 API（getMonthlyTrend），保留原本呼叫
+}
+
+// ── ① 指標卡片 ──
+function renderMetricCards(posts) {
+  const mLoading = document.getElementById('a2-metrics-loading');
+  const mGrid    = document.getElementById('a2-metrics-grid');
+
+  if (!posts.length) {
+    if (mLoading) mLoading.textContent = '尚無資料';
+    return;
+  }
+
+  let totalViews = 0, totalLikes = 0, totalReplies = 0, totalReposts = 0;
+  posts.forEach(p => {
+    totalViews   += p.views   || 0;
+    totalLikes   += p.likes   || 0;
+    totalReplies += p.replies || 0;
+    totalReposts += p.reposts || 0;
+  });
+
+  const totalPosts   = posts.length;
+  const avgViews     = totalPosts > 0 ? totalViews / totalPosts : 0;
+  const totalEngage  = totalLikes + totalReplies + totalReposts;
+  const engageRate   = totalViews > 0 ? (totalEngage / totalViews * 100) : 0;
+  const replyRate    = totalViews > 0 ? (totalReplies / totalViews * 100) : 0;
+  const repostRate   = totalViews > 0 ? (totalReposts / totalViews * 100) : 0;
+  const avgEngage    = totalPosts > 0 ? (totalEngage / totalPosts) : 0;
+  const viralPosts   = posts.filter(p => (p.views || 0) >= avgViews * 2).length;
+  const viralRate    = totalPosts > 0 ? (viralPosts / totalPosts * 100) : 0;
+
+  document.getElementById('mc-engage-rate-val').textContent  = engageRate.toFixed(2) + '%';
+  document.getElementById('mc-reply-rate-val').textContent   = replyRate.toFixed(2)  + '%';
+  document.getElementById('mc-repost-rate-val').textContent  = repostRate.toFixed(2) + '%';
+  document.getElementById('mc-avg-engage-val').textContent   = avgEngage.toFixed(1);
+  document.getElementById('mc-viral-rate-val').textContent   = viralRate.toFixed(1)  + '%';
+
+  if (mLoading) mLoading.style.display = 'none';
+  if (mGrid)    { mGrid.style.display = 'grid'; }
+}
+
+// ── ② 主題平均瀏覽柱狀圖（改為接收資料而非打 API）──
+function renderTopicAvg(posts) {
   const loading = document.getElementById('a2-topic-loading');
   const wrap    = document.getElementById('a2-topic-wrap');
   const meta    = document.getElementById('a2-topic-meta');
-  if (loading) { loading.style.display = 'block'; loading.textContent = '載入中...'; }
+  if (loading) { loading.style.display = 'block'; loading.textContent = '計算中...'; }
   if (wrap)    wrap.style.display = 'none';
   if (meta)    meta.innerHTML = '';
 
-  try {
-    const params = { action: 'getTopicAvgViews' };
-    if (a2CurrentAccount) params.account = a2CurrentAccount;
-    const res = await ag(params);
-    if (!res) return;
+  if (!posts.length) {
+    if (loading) loading.textContent = '尚無主題資料';
+    return;
+  }
 
-    const { labels, avgViews, postCounts } = res;
-    if (!labels || labels.length === 0) {
-      if (loading) loading.textContent = '尚無主題資料';
-      return;
-    }
+  // 計算各主題平均瀏覽
+  const topicMap = {};
+  posts.forEach(p => {
+    const topic = p.topic || '（未分類）';
+    if (!topicMap[topic]) topicMap[topic] = { totalViews: 0, count: 0 };
+    topicMap[topic].totalViews += p.views || 0;
+    topicMap[topic].count++;
+  });
 
-    const barColor = a2CurrentAccount === 'tkbletsplay_'   ? '#9A7ED0'
-                   : a2CurrentAccount === 'tkbletsgo.usca' ? '#76C8A7'
-                   : a2CurrentAccount === 'tkbletsgo.ukau' ? '#FFA534'
-                   : '#7C6BC4';
+  const sorted = Object.entries(topicMap)
+    .map(([topic, v]) => ({ topic, avgViews: v.count > 0 ? Math.round(v.totalViews / v.count) : 0, count: v.count }))
+    .sort((a, b) => b.avgViews - a.avgViews);
 
-    if (loading) loading.style.display = 'none';
-    if (wrap)    wrap.style.display = 'block';
+  const labels     = sorted.map(e => e.topic);
+  const avgViews   = sorted.map(e => e.avgViews);
+  const postCounts = sorted.map(e => e.count);
 
-    if (chartTopicAvg) { chartTopicAvg.destroy(); chartTopicAvg = null; }
+  const barColor = a2CurrentAccount === 'tkbletsplay_'   ? '#9A7ED0'
+                 : a2CurrentAccount === 'tkbletsgo.usca' ? '#76C8A7'
+                 : a2CurrentAccount === 'tkbletsgo.ukau' ? '#FFA534'
+                 : '#7C6BC4';
 
-    const isLight = document.body.classList.contains('light-mode');
-    const gridCol = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
-    const textCol = isLight ? '#6B6B6B' : '#A0A0A0';
-    const textPri = isLight ? '#1A1A1A' : '#F0F0F0';
+  if (loading) loading.style.display = 'none';
+  if (wrap)    wrap.style.display = 'block';
 
-    const ctx = document.getElementById('chart-topic-avg').getContext('2d');
-    chartTopicAvg = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          label: '平均瀏覽',
-          data: avgViews,
-          backgroundColor: barColor + 'BB',
-          borderColor: barColor,
-          borderWidth: 1,
-          borderRadius: 6
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: isLight ? '#fff' : '#2C2C2E',
-            borderColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
-            borderWidth: 1,
-            titleColor: textPri,
-            bodyColor: textCol,
-            callbacks: {
-              label: ctx => {
-                const idx = ctx.dataIndex;
-                return ` 平均瀏覽 ${ctx.parsed.x.toLocaleString()}　（${postCounts[idx]} 篇）`;
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            grid: { color: gridCol },
-            ticks: { color: textCol, font: { size: 11 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v }
-          },
-          y: {
-            grid: { display: false },
-            ticks: { color: textPri, font: { size: 12 } }
-          }
+  if (chartTopicAvg) { chartTopicAvg.destroy(); chartTopicAvg = null; }
+
+  const isLight = document.body.classList.contains('light-mode');
+  const gridCol = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+  const textCol = isLight ? '#6B6B6B' : '#A0A0A0';
+  const textPri = isLight ? '#1A1A1A' : '#F0F0F0';
+
+  const ctx = document.getElementById('chart-topic-avg').getContext('2d');
+  chartTopicAvg = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: '平均瀏覽', data: avgViews, backgroundColor: barColor + 'BB', borderColor: barColor, borderWidth: 1, borderRadius: 6 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: isLight ? '#fff' : '#2C2C2E',
+          borderColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
+          borderWidth: 1, titleColor: textPri, bodyColor: textCol,
+          callbacks: { label: ctx => ` 平均瀏覽 ${ctx.parsed.x.toLocaleString()}　（${postCounts[ctx.dataIndex]} 篇）` }
         }
+      },
+      scales: {
+        x: { grid: { color: gridCol }, ticks: { color: textCol, font: { size: 11 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'K' : v } },
+        y: { grid: { display: false }, ticks: { color: textPri, font: { size: 12 } } }
       }
-    });
-
-    if (meta) {
-      meta.innerHTML = labels.map((l, i) =>
-        `<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border)">${l} <b style="color:var(--text-secondary)">${postCounts[i]}</b> 篇</span>`
-      ).join('');
     }
+  });
 
-  } catch (e) {
-    if (loading) loading.textContent = '載入失敗，請確認 API 連線';
-    console.error('loadTopicAvg error:', e);
+  if (meta) {
+    meta.innerHTML = labels.map((l, i) =>
+      `<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border)">${l} <b style="color:var(--text-secondary)">${postCounts[i]}</b> 篇</span>`
+    ).join('');
   }
 }
 
+// ── ③ 發文時間熱圖 ──
+function renderTimeHeatmap(posts) {
+  const loading = document.getElementById('a2-timeheat-loading');
+  const wrap    = document.getElementById('a2-timeheat-wrap');
+  if (loading) { loading.style.display = 'block'; loading.textContent = '計算中...'; }
+  if (wrap)    wrap.style.display = 'none';
+
+  if (!posts.length) {
+    if (loading) loading.textContent = '尚無資料';
+    return;
+  }
+
+  const DAYS = ['一', '二', '三', '四', '五', '六', '日'];
+  // 建立 7x24 空桶 [weekday 1-7][hour 0-23]
+  const grid = Array.from({ length: 24 }, () => Array.from({ length: 7 }, () => ({ views: 0, count: 0 })));
+
+  posts.forEach(p => {
+    if (!p.timestamp) return;
+    const d = new Date(p.timestamp);
+    if (isNaN(d)) return;
+    const hour    = d.getHours();                        // 0-23
+    const weekday = (d.getDay() + 6) % 7;               // 0=週一, 6=週日
+    grid[hour][weekday].views += p.views || 0;
+    grid[hour][weekday].count++;
+  });
+
+  // 計算要顯示的值
+  const vals = grid.map(row => row.map(cell =>
+    timeHeatMode === 'views'
+      ? (cell.count > 0 ? Math.round(cell.views / cell.count) : 0)
+      : cell.count
+  ));
+
+  const maxVal = Math.max(...vals.flat(), 1);
+
+  const accentColor = a2CurrentAccount === 'tkbletsplay_'   ? [154, 126, 208]
+                    : a2CurrentAccount === 'tkbletsgo.usca' ? [118, 200, 167]
+                    : a2CurrentAccount === 'tkbletsgo.ukau' ? [255, 165, 52]
+                    : [124, 107, 196];
+  const [r, g, b] = accentColor;
+
+  // 表頭
+  const header = document.getElementById('th-header');
+  if (header) {
+    header.innerHTML = '<div style="font-size:9px;color:var(--text-muted)"></div>' +
+      DAYS.map(d => `<div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-align:center">週${d}</div>`).join('');
+  }
+
+  // 熱圖主體
+  const body = document.getElementById('th-body');
+  if (body) {
+    body.innerHTML = vals.map((row, hour) => {
+      const cells = row.map((val, wd) => {
+        const ratio = maxVal > 0 ? val / maxVal : 0;
+        const alpha = ratio < 0.05 ? 0.05 : ratio;
+        const textColor = ratio > 0.5 ? '#fff' : `rgb(${r},${g},${b})`;
+        const display = val === 0 ? '—' : val >= 1000 ? (val/1000).toFixed(1)+'K' : val;
+        const tip = timeHeatMode === 'views' ? `週${DAYS[wd]} ${hour}點  平均瀏覽：${val.toLocaleString()}` : `週${DAYS[wd]} ${hour}點  發文 ${val} 篇`;
+        return `<div style="border-radius:4px;padding:4px 2px;text-align:center;font-size:9px;font-family:var(--font-mono);font-weight:600;background:rgba(${r},${g},${b},${alpha});color:${textColor};cursor:default" title="${tip}">${display}</div>`;
+      }).join('');
+      const hourLabel = `<div style="font-size:9px;color:var(--text-muted);text-align:right;padding-right:6px;line-height:1;display:flex;align-items:center;justify-content:flex-end">${String(hour).padStart(2,'0')}</div>`;
+      return `<div style="display:grid;grid-template-columns:36px repeat(7,1fr);gap:3px">${hourLabel}${cells}</div>`;
+    }).join('');
+  }
+
+  // 圖例
+  const legend = document.getElementById('th-legend');
+  if (legend) {
+    legend.innerHTML = [0.1, 0.25, 0.5, 0.75, 1.0].map(ratio => {
+      const alpha = ratio < 0.05 ? 0.05 : ratio;
+      return `<div style="width:18px;height:14px;border-radius:3px;background:rgba(${r},${g},${b},${alpha})"></div>`;
+    }).join('');
+  }
+
+  if (loading) loading.style.display = 'none';
+  if (wrap)    wrap.style.display = 'block';
+}
+
+// ── ④ 月度發文折線圖（保留獨立 API 呼叫）──
 async function loadMonthlyTrend() {
   const loading = document.getElementById('a2-monthly-loading');
   const wrap    = document.getElementById('a2-monthly-wrap');
@@ -1653,80 +1843,30 @@ async function loadMonthlyTrend() {
                     : '#7C6BC4';
 
     const xLabels = months.map(m => m.slice(2).replace('-', '/'));
-
     const ctx = document.getElementById('chart-monthly-trend').getContext('2d');
     chartMonthly = new Chart(ctx, {
       type: 'line',
       data: {
         labels: xLabels,
         datasets: [
-          {
-            label: '發文數',
-            data: postCounts,
-            borderColor: lineColor,
-            backgroundColor: lineColor + '22',
-            fill: true,
-            tension: 0.4,
-            pointRadius: 4,
-            pointBackgroundColor: lineColor,
-            yAxisID: 'y'
-          },
-          {
-            label: '總瀏覽',
-            data: totalViews,
-            borderColor: '#F5C842',
-            backgroundColor: 'transparent',
-            fill: false,
-            tension: 0.4,
-            pointRadius: 4,
-            pointBackgroundColor: '#F5C842',
-            borderDash: [5, 3],
-            yAxisID: 'y2'
-          }
+          { label: '發文數', data: postCounts, borderColor: lineColor, backgroundColor: lineColor + '22', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: lineColor, yAxisID: 'y' },
+          { label: '總瀏覽', data: totalViews, borderColor: '#F5C842', backgroundColor: 'transparent', fill: false, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#F5C842', borderDash: [5, 3], yAxisID: 'y2' }
         ]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: {
-            display: true,
-            labels: { color: textCol, font: { size: 11 }, boxWidth: 12 }
-          },
-          tooltip: {
-            backgroundColor: isLight ? '#fff' : '#2C2C2E',
-            borderColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
-            borderWidth: 1,
-            titleColor: isLight ? '#1A1A1A' : '#F0F0F0',
-            bodyColor: textCol
-          }
+          legend: { display: true, labels: { color: textCol, font: { size: 11 }, boxWidth: 12 } },
+          tooltip: { backgroundColor: isLight ? '#fff' : '#2C2C2E', borderColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)', borderWidth: 1, titleColor: isLight ? '#1A1A1A' : '#F0F0F0', bodyColor: textCol }
         },
         scales: {
-          x: {
-            grid: { color: gridCol },
-            ticks: { color: textCol, font: { size: 11 } }
-          },
-          y: {
-            position: 'left',
-            grid: { color: gridCol },
-            ticks: { color: lineColor, font: { size: 11 } },
-            title: { display: true, text: '發文數', color: lineColor, font: { size: 10 } }
-          },
-          y2: {
-            position: 'right',
-            grid: { display: false },
-            ticks: {
-              color: '#F5C842',
-              font: { size: 11 },
-              callback: v => v >= 1000 ? (v/1000).toFixed(0)+'K' : v
-            },
-            title: { display: true, text: '總瀏覽', color: '#F5C842', font: { size: 10 } }
-          }
+          x: { grid: { color: gridCol }, ticks: { color: textCol, font: { size: 11 } } },
+          y: { position: 'left', grid: { color: gridCol }, ticks: { color: lineColor, font: { size: 11 } }, title: { display: true, text: '發文數', color: lineColor, font: { size: 10 } } },
+          y2: { position: 'right', grid: { display: false }, ticks: { color: '#F5C842', font: { size: 11 }, callback: v => v >= 1000 ? (v/1000).toFixed(0)+'K' : v }, title: { display: true, text: '總瀏覽', color: '#F5C842', font: { size: 10 } } }
         }
       }
     });
-
   } catch (e) {
     if (loading) loading.textContent = '載入失敗，請確認 API 連線';
     console.error('loadMonthlyTrend error:', e);
