@@ -107,9 +107,9 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
 .filter-select{cursor:pointer}.filter-select:focus,.filter-input:focus{border-color:var(--accent)}
 .filter-input::placeholder{color:var(--text-muted)}.filter-input{flex:1;min-width:200px}
 .post-table{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
-.post-table-header,.post-row{display:grid;grid-template-columns:200px 100px 80px 70px 70px 70px 80px 90px;padding:10px 16px;align-items:center}
+.post-table-header,.post-row{display:grid;grid-template-columns:500px 110px 90px 90px 90px 90px 90px 100px;padding:14px 16px;align-items:center}
 .post-table-header{background:var(--bg-elevated);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase}
-.post-row{border-bottom:1px solid var(--border);transition:background .1s;padding:10px 16px}
+.post-row{border-bottom:1px solid var(--border);transition:background .1s;padding:14px 16px}
 .post-row:last-child{border-bottom:none}.post-row:hover{background:var(--bg-hover)}
 
 .post-meta{display:flex;align-items:center;gap:6px;margin-top:3px}
@@ -118,7 +118,7 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
 .post-date{font-size:10px;color:var(--text-muted)}
 .topic-badge{font-size:10px;padding:2px 8px;border-radius:99px;background:var(--bg-elevated);color:var(--text-secondary);border:1px solid var(--border-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;display:inline-block}
 .metric-cell{font-size:12px;font-family:var(--font-mono);color:var(--text-secondary)}
-.post-table-body{max-height:480px;overflow-y:auto}
+.post-table-body{overflow-x:auto}
 .copy-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;height:calc(100vh - 140px)}
 .copy-panel{display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding-right:4px}
 .copy-control-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px}
@@ -216,7 +216,7 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
 .cta-status-sel.cta-none{background:var(--bg-elevated);color:var(--text-muted)}
 .post-expand{animation:expandIn .18s ease}
 @keyframes expandIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-.post-content-text{font-size:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
+.post-content-text{font-size:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:460px}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-primary);padding:10px 18px;border-radius:99px;font-size:12px;font-weight:600;z-index:9999;opacity:0;transition:all .25s;white-space:nowrap;display:flex;align-items:center;gap:7px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
@@ -236,7 +236,7 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
     <div class="nav-item active" data-page="dashboard" onclick="navTo('dashboard',this)"><span class="nav-icon">📊</span><span>總覽 Dashboard</span></div>
     <div class="nav-item" data-page="posts" onclick="navTo('posts',this)"><span class="nav-icon">📋</span><span>貼文管理</span></div>
     <div class="nav-item" data-page="analytics" onclick="navTo('analytics',this)"><span class="nav-icon">🤖</span><span>AI 數據分析</span></div>
-    <div class="nav-item" data-page="analytics2" onclick="navTo('analytics2',this)"><span class="nav-icon">📊</span><span>有數據</span></div>
+    <div class="nav-item" data-page="analytics2" onclick="navTo('analytics2',this)"><span class="nav-icon">📊</span><span>數據洞察</span></div>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-section-label">內容操作</div>
@@ -408,7 +408,7 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
   <div class="page-header">
     <div class="page-header-inner">
       <div>
-        <div class="page-title">📊 有數據</div>
+        <div class="page-title">📊 數據洞察</div>
         <div class="page-subtitle">主題平均瀏覽 · 月度發文趨勢</div>
       </div>
     </div>
