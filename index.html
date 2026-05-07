@@ -749,6 +749,59 @@ window.addEventListener('DOMContentLoaded',()=>{
   // 頁面切換由 navTo() 全域函式處理
 });
 
+function initCharts(){
+  const isLight=document.body.classList.contains('light-mode');
+  const opt=co('line');
+  const optDoughnut=co('doughnut');
+
+  // 30天發文趨勢
+  const trendCtx=document.getElementById('trendChart');
+  if(trendCtx){
+    charts.trend=new Chart(trendCtx.getContext('2d'),{
+      type:'line',
+      data:{labels:[],datasets:[
+        {label:'總瀏覽',data:[],borderColor:'#7C6BC4',backgroundColor:'rgba(124,107,196,0.1)',fill:true,tension:.4,pointRadius:3,yAxisID:'y'},
+        {label:'發文數',data:[],borderColor:'#76C8A7',backgroundColor:'transparent',fill:false,tension:.4,pointRadius:3,yAxisID:'y1'}
+      ]},
+      options:{...opt,scales:{
+        x:{ticks:{color:'#6B6B6B',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},
+        y:{position:'left',ticks:{color:'#7C6BC4',font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v},grid:{color:'rgba(255,255,255,0.05)'}},
+        y1:{position:'right',ticks:{color:'#76C8A7',font:{size:10}},grid:{display:false}}
+      }}
+    });
+  }
+
+  // 主題分布圓餅
+  const topicCtx=document.getElementById('topicChart');
+  if(topicCtx){
+    charts.topic=new Chart(topicCtx.getContext('2d'),{
+      type:'doughnut',
+      data:{labels:[],datasets:[{data:[],backgroundColor:[],borderWidth:0}]},
+      options:{...optDoughnut,cutout:'65%'}
+    });
+  }
+
+  // AI分析頁：主題平均瀏覽柱狀圖
+  const tbarCtx=document.getElementById('topicBarChart');
+  if(tbarCtx){
+    charts.tbar=new Chart(tbarCtx.getContext('2d'),{
+      type:'bar',
+      data:{labels:[],datasets:[{label:'平均瀏覽',data:[],backgroundColor:'rgba(124,107,196,0.7)',borderColor:'#7C6BC4',borderWidth:1,borderRadius:4}]},
+      options:{...opt,indexAxis:'y',plugins:{legend:{display:false}}}
+    });
+  }
+
+  // AI分析頁：月度發文統計折線圖
+  const monthlyCtx=document.getElementById('monthlyChart');
+  if(monthlyCtx){
+    charts.monthly=new Chart(monthlyCtx.getContext('2d'),{
+      type:'line',
+      data:{labels:[],datasets:[]},
+      options:opt
+    });
+  }
+}
+
 // API
 async function ag(p){if(!API){toast('⚠️ 請先設定 GAS API URL');return null;}const u=new URL(API);Object.entries(p).forEach(([k,v])=>u.searchParams.set(k,v));try{const r=await fetch(u.toString());const j=await r.json();if(j.success===false)throw new Error(j.message);return j.data!==undefined?j.data:j;}catch(e){toast('❌ '+e.message);return null;}}
 async function ap(b){if(!API){toast('⚠️ 請先設定 GAS API URL');return null;}try{const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return await r.json();}catch(e){toast('❌ '+e.message);return null;}}
