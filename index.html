@@ -958,13 +958,27 @@ async function loadAnalytics(){if(!API)return;const d=await ag({action:'getDashb
 // AI Chat
 async function ensureCtx(){if(!aiStats)aiStats=await ag({action:'getStats'});if(!aiPosts){const d=await ag({action:'getDashboardData'});aiPosts=d?d.posts:[];}}
 async function askAI(q){document.getElementById('ai-input').value=q;await sendAI();}
-async function sendAI(){const inp=document.getElementById('ai-input');const q=inp.value.trim();if(!q)return;if(!GEM){toast('⚠️ 請先設定 Gemini API Key');return;}
-  const mc=document.getElementById('ai-messages');mc.innerHTML+=`<div class="ai-msg user">${eh(q)}</div>`;const lid='l'+Date.now();mc.innerHTML+=`<div class="ai-msg bot" id="${lid}">🤔 分析中...</div>`;mc.scrollTop=mc.scrollHeight;inp.value='';
+async function sendAI(){
+  const inp=document.getElementById('ai-input');
+  const q=inp.value.trim();
+  if(!q)return;
+  if(!API){toast('⚠️ 請先設定 GAS API URL');return;}
+  const mc=document.getElementById('ai-messages');
+  mc.innerHTML+=`<div class="ai-msg user">${eh(q)}</div>`;
+  const lid='l'+Date.now();
+  mc.innerHTML+=`<div class="ai-msg bot" id="${lid}">🤔 分析中...</div>`;
+  mc.scrollTop=mc.scrollHeight;
+  inp.value='';
   await ensureCtx();
   const tm={};(aiPosts||[]).forEach(p=>{const t=p.topic||'未分類';if(!tm[t])tm[t]={count:0,tv:0};tm[t].count++;tm[t].tv+=p.views;});
   const ctx=`你是 TKB 放洋留遊學的 Threads 數據分析師。數據摘要：\n- 總貼文：${aiStats?.totalPosts||'未知'} 篇\n- 總瀏覽：${fn(aiStats?.totalViews||0)}\n- 平均瀏覽/篇：${fn(aiStats?.avgViews||0)}\n- 主題成效：\n${Object.entries(tm).map(([t,d])=>`  ${t}：${d.count}篇，均${Math.round(d.tv/d.count)}瀏覽`).join('\n')}\n\n請用繁體中文回答（200字內，語氣像社群顧問）：${q}`;
-  try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEM}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:ctx}]}],generationConfig:{temperature:.7,maxOutputTokens:500}})});const j=await r.json();const t=j.candidates?.[0]?.content?.parts?.[0]?.text||'分析失敗';document.getElementById(lid).innerHTML=t.replace(/\n/g,'<br>');}catch(e){document.getElementById(lid).textContent='❌ 失敗：'+e.message;}
-  mc.scrollTop=mc.scrollHeight;}
+  try{
+    const res=await ag({action:'askGemini',prompt:encodeURIComponent(ctx)});
+    const t=res?.text||'分析失敗';
+    document.getElementById(lid).innerHTML=t.replace(/\n/g,'<br>');
+  }catch(e){document.getElementById(lid).textContent='❌ 失敗：'+e.message;}
+  mc.scrollTop=mc.scrollHeight;
+}
 
 // Copywriter
 let advOpen=false;
@@ -1456,7 +1470,6 @@ async function quickEditTopic(postId, currentTopic, cellEl) {
   if (!postId) return;
   const topics = ['遊學','旅遊懶人包','留學情報','活動','榜單快訊','軟性文案','知識內容'];
 
-  // 建立 inline select
   const sel = document.createElement('select');
   sel.className = 'filter-select';
   sel.style.cssText = 'font-size:10px;padding:3px 6px;border-radius:6px;width:100px';
@@ -1464,25 +1477,21 @@ async function quickEditTopic(postId, currentTopic, cellEl) {
     `<option value="${t}" ${t===currentTopic?'selected':''}>${t}</option>`
   ).join('');
 
-  const badge = cellEl.querySelector('.topic-badge');
-  cellEl.replaceChild(sel, badge);
+  // 修正：用 innerHTML 清空後插入，避免 badge 為 null 時 replaceChild 報錯
+  cellEl.innerHTML = '';
+  cellEl.appendChild(sel);
   sel.focus();
 
   const confirm = async () => {
     const newTopic = sel.value;
-    // 恢復顯示
-    const newBadge = document.createElement('span');
-    newBadge.className = 'topic-badge';
-    newBadge.textContent = newTopic;
-    cellEl.replaceChild(newBadge, sel);
-
+    cellEl.innerHTML = `<span class="topic-badge">${newTopic}</span>`;
     if (newTopic !== currentTopic) {
-      const r = await ap({ action: 'updatePostTopic', postId, topic: newTopic });
-      if (r?.data?.success) {
+      const r = await ag({ action: 'updatePostTopic', postId, topic: newTopic });
+      if (r?.success) {
         toast('✅ 主題已更新：' + newTopic);
       } else {
         toast('❌ 更新失敗');
-        newBadge.textContent = currentTopic || '—';
+        cellEl.innerHTML = `<span class="topic-badge">${currentTopic || '—'}</span>`;
       }
     }
   };
