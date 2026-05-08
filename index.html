@@ -635,9 +635,9 @@ body.light-mode .form-input[type="datetime-local"]{color-scheme:light}
           <div class="form-group"><div class="form-label">主文內容</div><textarea class="form-textarea" id="sc" rows="5" placeholder="輸入貼文主文..."></textarea></div>
           <div class="divider"></div>
           <div class="form-group"><div class="form-label">回文 1（選填）</div><textarea class="form-textarea" id="sr1" rows="2" placeholder="第一則回文..."></textarea></div>
-          <div class="form-group"><div class="form-label">回文 1 延遲（分鐘）</div><input class="form-input" id="sd1" type="number" value="5" min="1"></div>
+          <div class="form-group"><div class="form-label">回文 1 延遲（分鐘）</div><input class="form-input" id="sd1" type="number" placeholder="留空 = 立即發送" min="0"></div>
           <div class="form-group"><div class="form-label">回文 2（選填）</div><textarea class="form-textarea" id="sr2" rows="2" placeholder="第二則回文..."></textarea></div>
-          <div class="form-group"><div class="form-label">回文 2 延遲（分鐘）</div><input class="form-input" id="sd2" type="number" value="30" min="1"></div>
+          <div class="form-group"><div class="form-label">回文 2 延遲（分鐘）</div><input class="form-input" id="sd2" type="number" placeholder="留空 = 立即發送" min="0"></div>
           <div class="divider"></div>
           <div class="form-group"><div class="form-label">貼文主題</div><select class="copy-select" id="stopic" style="width:100%"><option>遊學</option><option>旅遊懶人包</option><option>留學情報</option><option>活動</option><option>榜單快訊</option><option>軟性文案</option><option>知識內容</option></select></div>
           <input type="hidden" id="sched-edit-row" value="">
@@ -1124,8 +1124,8 @@ async function submitSched() {
   const topic      = document.getElementById('stopic').value;
   const reply1     = document.getElementById('sr1').value.trim();
   const reply2     = document.getElementById('sr2').value.trim();
-  const delay1     = document.getElementById('sd1').value || '5';
-  const delay2     = document.getElementById('sd2').value || '30';
+  const delay1     = document.getElementById('sd1').value !== '' ? document.getElementById('sd1').value : '0';
+  const delay2     = document.getElementById('sd2').value !== '' ? document.getElementById('sd2').value : '0';
   const editRow    = document.getElementById('sched-edit-row').value;
   const isEditMode = !!editRow;
 
@@ -1215,8 +1215,8 @@ function cancelSchedEdit() {
   document.getElementById('sc').value = '';
   document.getElementById('sr1').value = '';
   document.getElementById('sr2').value = '';
-  document.getElementById('sd1').value = '5';
-  document.getElementById('sd2').value = '30';
+  document.getElementById('sd1').value = '';
+  document.getElementById('sd2').value = '';
   document.getElementById('stopic').value = '遊學';
 }
 
