@@ -137,6 +137,7 @@ body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary)
 .form-input,.form-textarea{background:var(--bg-elevated);border:1px solid var(--border-light);color:var(--text-primary);font-size:12px;padding:8px 12px;border-radius:8px;outline:none;font-family:var(--font);transition:border-color .15s;width:100%;color-scheme:dark}
 .form-input:focus,.form-textarea:focus{border-color:var(--accent)}
 .form-input::placeholder,.form-textarea::placeholder{color:var(--text-muted)}
+body.light-mode .form-input[type="datetime-local"]{color-scheme:light}
 .form-textarea{resize:vertical;min-height:60px}
 .copy-input-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;flex:1;display:flex;flex-direction:column}
 .copy-input-header{padding:10px 14px;background:var(--bg-elevated);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
@@ -1113,7 +1114,67 @@ async function chkTone(){
 function toSched(){const c=vers[actVer]?.content;if(!c)return;document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-schedule').classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.page==='schedule'));setTimeout(()=>{document.getElementById('sc').value=c;toast('✅ 文案已帶入排程表單');},100);}
 
 // Schedule
-async function submitSched(){const account=document.getElementById('sa').value,time=document.getElementById('st').value,content=document.getElementById('sc').value.trim();if(!content){toast('⚠️ 請輸入主文內容');return;}if(!time){toast('⚠️ 請設定發布時間');return;}const schedTime=new Date(time),now=new Date();if(schedTime<=now){const r=await ap({action:'createPost',data:{account,content,topic:document.getElementById('stopic').value}});if(r?.data?.success){toast('✅ 貼文已立即發布！');}else{toast('❌ 發布失敗：'+(r?.data?.message||'未知'));}}else{toast('📅 排程功能請確認 GAS 時間觸發器已設定');}}
+async function submitSched() {
+  const account = document.getElementById('sa').value;
+  const time    = document.getElementById('st').value;
+  const content = document.getElementById('sc').value.trim();
+  const topic   = document.getElementById('stopic').value;
+  const reply1  = document.getElementById('sr1').value.trim();
+  const reply2  = document.getElementById('sr2').value.trim();
+  const delay1  = document.getElementById('sd1').value || '5';
+  const delay2  = document.getElementById('sd2').value || '30';
+
+  if (!content) { toast('⚠️ 請輸入主文內容'); return; }
+  if (!time)    { toast('⚠️ 請設定發布時間'); return; }
+
+  const schedTime = new Date(time);
+  const now       = new Date();
+  const btn       = document.querySelector('#page-schedule .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '處理中...'; }
+
+  try {
+    if (schedTime <= now) {
+      // 立即發文
+      const r = await ag({
+        action:  'createPost',
+        account,
+        content:  encodeURIComponent(content),
+        topic:    encodeURIComponent(topic)
+      });
+      if (r?.success) {
+        toast('✅ 貼文已立即發布！');
+        document.getElementById('sc').value = '';
+      } else {
+        toast('❌ 發布失敗：' + (r?.message || '請確認 API'));
+      }
+    } else {
+      // 排程發文：寫進 GAS 工作表
+      const r = await ag({
+        action:      'addSchedule',
+        account,
+        schedTime:   encodeURIComponent(schedTime.toISOString()),
+        content:     encodeURIComponent(content),
+        reply1:      encodeURIComponent(reply1),
+        reply1Delay: delay1,
+        reply2:      encodeURIComponent(reply2),
+        reply2Delay: delay2,
+        topic:       encodeURIComponent(topic)
+      });
+      if (r?.success) {
+        toast('📅 排程已新增！將於 ' + time + ' 發布');
+        document.getElementById('sc').value = '';
+        document.getElementById('sr1').value = '';
+        document.getElementById('sr2').value = '';
+      } else {
+        toast('❌ 排程失敗：' + (r?.message || '請確認 API'));
+      }
+    }
+  } catch (e) {
+    toast('❌ 錯誤：' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📅 新增排程'; }
+  }
+}
 
 // Utils
 function fn(n){if(n==null)return'0';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return n.toString();}
