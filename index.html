@@ -1165,6 +1165,7 @@ async function submitSched() {
         document.getElementById('sc').value = '';
         document.getElementById('sr1').value = '';
         document.getElementById('sr2').value = '';
+        loadScheduleList();
       } else {
         toast('❌ 排程失敗：' + (r?.message || '請確認 API'));
       }
@@ -1204,7 +1205,10 @@ async function loadScheduleList() {
   } catch (e) {
     el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px">載入失敗</div>';
   }
-}{if(n==null)return'0';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return n.toString();}
+}
+
+// Utils
+function fn(n){if(n==null)return'0';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return n.toString();}
 function fd(ts){if(!ts)return'';const d=new Date(ts);if(isNaN(d))return'';return(d.getMonth()+1)+'/'+(d.getDate());}
 function eh(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function al(a){return a==='tkbletsplay_'?'遊學':a==='tkbletsgo.usca'?'美加':'英澳';}
