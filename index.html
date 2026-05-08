@@ -640,7 +640,11 @@ body.light-mode .form-input[type="datetime-local"]{color-scheme:light}
           <div class="form-group"><div class="form-label">回文 2 延遲（分鐘）</div><input class="form-input" id="sd2" type="number" value="30" min="1"></div>
           <div class="divider"></div>
           <div class="form-group"><div class="form-label">貼文主題</div><select class="copy-select" id="stopic" style="width:100%"><option>遊學</option><option>旅遊懶人包</option><option>留學情報</option><option>活動</option><option>榜單快訊</option><option>軟性文案</option><option>知識內容</option></select></div>
-          <button class="btn btn-primary btn-lg" onclick="submitSched()">📅 新增排程</button>
+          <input type="hidden" id="sched-edit-row" value="">
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-lg" id="sched-submit-btn" onclick="submitSched()" style="flex:1">📅 新增排程</button>
+            <button class="btn btn-ghost btn-lg" id="sched-cancel-btn" onclick="cancelSchedEdit()" style="display:none">取消</button>
+          </div>
         </div>
       </div>
       <div>
@@ -1113,27 +1117,49 @@ async function chkTone(){
 }
 function toSched(){const c=vers[actVer]?.content;if(!c)return;document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-schedule').classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.page==='schedule'));setTimeout(()=>{document.getElementById('sc').value=c;toast('✅ 文案已帶入排程表單');},100);}
 
-// Schedule
 async function submitSched() {
-  const account = document.getElementById('sa').value;
-  const time    = document.getElementById('st').value;
-  const content = document.getElementById('sc').value.trim();
-  const topic   = document.getElementById('stopic').value;
-  const reply1  = document.getElementById('sr1').value.trim();
-  const reply2  = document.getElementById('sr2').value.trim();
-  const delay1  = document.getElementById('sd1').value || '5';
-  const delay2  = document.getElementById('sd2').value || '30';
+  const account    = document.getElementById('sa').value;
+  const time       = document.getElementById('st').value;
+  const content    = document.getElementById('sc').value.trim();
+  const topic      = document.getElementById('stopic').value;
+  const reply1     = document.getElementById('sr1').value.trim();
+  const reply2     = document.getElementById('sr2').value.trim();
+  const delay1     = document.getElementById('sd1').value || '5';
+  const delay2     = document.getElementById('sd2').value || '30';
+  const editRow    = document.getElementById('sched-edit-row').value;
+  const isEditMode = !!editRow;
 
   if (!content) { toast('⚠️ 請輸入主文內容'); return; }
   if (!time)    { toast('⚠️ 請設定發布時間'); return; }
 
   const schedTime = new Date(time);
   const now       = new Date();
-  const btn       = document.querySelector('#page-schedule .btn-primary');
+  const btn       = document.getElementById('sched-submit-btn');
   if (btn) { btn.disabled = true; btn.textContent = '處理中...'; }
 
   try {
-    if (schedTime <= now) {
+    if (isEditMode) {
+      // 編輯模式：更新現有排程
+      const r = await ag({
+        action:      'updateScheduleRow',
+        rowIndex:    editRow,
+        account,
+        schedTime:   encodeURIComponent(schedTime.toISOString()),
+        content:     encodeURIComponent(content),
+        reply1:      encodeURIComponent(reply1),
+        reply1Delay: delay1,
+        reply2:      encodeURIComponent(reply2),
+        reply2Delay: delay2,
+        topic:       encodeURIComponent(topic)
+      });
+      if (r?.success) {
+        toast('✅ 排程已更新！');
+        cancelSchedEdit();
+        loadScheduleList();
+      } else {
+        toast('❌ 更新失敗：' + (r?.message || '請確認 API'));
+      }
+    } else if (schedTime <= now) {
       // 立即發文
       const r = await ag({
         action:  'createPost',
@@ -1148,7 +1174,7 @@ async function submitSched() {
         toast('❌ 發布失敗：' + (r?.message || '請確認 API'));
       }
     } else {
-      // 排程發文：寫進 GAS 工作表
+      // 新增排程
       const r = await ag({
         action:      'addSchedule',
         account,
@@ -1173,8 +1199,25 @@ async function submitSched() {
   } catch (e) {
     toast('❌ 錯誤：' + e.message);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '📅 新增排程'; }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = isEditMode ? '💾 更新排程' : '📅 新增排程';
+    }
   }
+}
+
+function cancelSchedEdit() {
+  document.getElementById('sched-edit-row').value = '';
+  const btn = document.getElementById('sched-submit-btn');
+  const cancel = document.getElementById('sched-cancel-btn');
+  if (btn) { btn.textContent = '📅 新增排程'; }
+  if (cancel) cancel.style.display = 'none';
+  document.getElementById('sc').value = '';
+  document.getElementById('sr1').value = '';
+  document.getElementById('sr2').value = '';
+  document.getElementById('sd1').value = '5';
+  document.getElementById('sd2').value = '30';
+  document.getElementById('stopic').value = '遊學';
 }
 
 // Schedule List
@@ -1189,21 +1232,69 @@ async function loadScheduleList() {
       el.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">尚無排程</div><div class="empty-desc">從左側新增發文排程</div></div>';
       return;
     }
-    el.innerHTML = list.map(item => `
+    el.innerHTML = list.map(item => {
+      const isPending = item.status === '待發布';
+      const acColor = item.account==='tkbletsplay_'?'#9A7ED0':item.account==='tkbletsgo.usca'?'#76C8A7':'#FFA534';
+      const timeStr = item.schedTime ? new Date(item.schedTime).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+      return `
       <div class="schedule-item">
         <div class="schedule-item-header">
-          <span class="schedule-item-account" style="color:${item.account==='tkbletsplay_'?'#9A7ED0':item.account==='tkbletsgo.usca'?'#76C8A7':'#FFA534'}">${al(item.account)}</span>
-          <span class="schedule-item-time">${item.schedTime ? new Date(item.schedTime).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}</span>
+          <span class="schedule-item-account" style="color:${acColor}">${al(item.account)}</span>
+          <span class="schedule-item-time">${timeStr}</span>
         </div>
         <div class="schedule-item-content">${eh(item.content||'')}</div>
-        <div style="margin-top:4px;display:flex;gap:6px;align-items:center">
-          <span style="font-size:10px;padding:1px 7px;border-radius:99px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border)">${item.status||'待發布'}</span>
-          ${item.topic?`<span style="font-size:10px;color:var(--text-muted)">${item.topic}</span>`:''}
+        <div style="margin-top:6px;display:flex;gap:6px;align-items:center;justify-content:space-between">
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:10px;padding:1px 7px;border-radius:99px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border)">${item.status||'待發布'}</span>
+            ${item.topic?`<span style="font-size:10px;color:var(--text-muted)">${item.topic}</span>`:''}
+          </div>
+          ${isPending ? `
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost" style="font-size:10px;padding:2px 8px;height:auto" onclick='editSched(${JSON.stringify(item)})'>✏️ 編輯</button>
+            <button class="btn" style="font-size:10px;padding:2px 8px;height:auto;background:var(--red-soft);color:var(--red);border:1px solid var(--red)" onclick="deleteSchedItem(${item.rowIndex})">🗑 刪除</button>
+          </div>` : ''}
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   } catch (e) {
     el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px">載入失敗</div>';
+  }
+}
+
+function editSched(item) {
+  // 帶入表單
+  document.getElementById('sa').value     = item.account   || 'tkbletsplay_';
+  document.getElementById('sc').value     = item.content   || '';
+  document.getElementById('stopic').value = item.topic     || '遊學';
+  document.getElementById('sr1').value    = item.reply1    || '';
+  document.getElementById('sr2').value    = item.reply2    || '';
+  document.getElementById('sd1').value    = item.reply1Delay || '5';
+  document.getElementById('sd2').value    = item.reply2Delay || '30';
+  if (item.schedTime) {
+    // 轉成 datetime-local 格式 yyyy-MM-ddTHH:mm
+    const d = new Date(item.schedTime);
+    const pad = n => String(n).padStart(2,'0');
+    document.getElementById('st').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  // 切換為編輯模式
+  document.getElementById('sched-edit-row').value = item.rowIndex;
+  const btn = document.getElementById('sched-submit-btn');
+  const cancel = document.getElementById('sched-cancel-btn');
+  if (btn) { btn.textContent = '💾 更新排程'; }
+  if (cancel) cancel.style.display = 'inline-flex';
+  // 捲動到表單
+  document.getElementById('sa').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  toast('✏️ 已載入排程資料，修改後按「更新排程」');
+}
+
+async function deleteSchedItem(rowIndex) {
+  if (!confirm('確定要刪除這筆排程嗎？')) return;
+  const r = await ag({ action: 'deleteScheduleRow', rowIndex });
+  if (r?.success) {
+    toast('✅ 排程已刪除');
+    loadScheduleList();
+  } else {
+    toast('❌ 刪除失敗：' + (r?.message || '請確認 API'));
   }
 }
 
