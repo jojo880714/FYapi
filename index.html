@@ -1438,27 +1438,37 @@ function editCTARule(r) {
 }
 
 async function saveCTARule() {
-  const data = {
-    rowIndex:  document.getElementById('cta-row-index').value ? parseInt(document.getElementById('cta-row-index').value) : null,
-    account:   document.getElementById('cta-account').value,
-    topic:     document.getElementById('cta-topic').value,
-    metric:    document.getElementById('cta-metric').value,
-    threshold: parseInt(document.getElementById('cta-threshold').value) || 0,
-    region:    document.getElementById('cta-region').value,
-    ctaText:   document.getElementById('cta-text').value.trim(),
-    enabled:   document.getElementById('cta-enabled').checked
-  };
-  if (!data.ctaText) { toast('⚠️ 請填入 CTA 文案'); return; }
-  if (!data.threshold) { toast('⚠️ 請填入觸發數值'); return; }
-  const r = await ap({ action: 'saveCTARule', data });
-  if (r?.data?.success) { toast('✅ 規則已儲存'); closeCTAForm(); loadCTARules(); }
-  else toast('❌ 儲存失敗：' + (r?.data?.message || ''));
+  const rowIndex  = document.getElementById('cta-row-index').value ? parseInt(document.getElementById('cta-row-index').value) : '';
+  const account   = document.getElementById('cta-account').value;
+  const topic     = document.getElementById('cta-topic').value;
+  const metric    = document.getElementById('cta-metric').value;
+  const threshold = parseInt(document.getElementById('cta-threshold').value) || 0;
+  const region    = document.getElementById('cta-region').value;
+  const ctaText   = document.getElementById('cta-text').value.trim();
+  const enabled   = document.getElementById('cta-enabled').checked;
+
+  if (!ctaText)    { toast('⚠️ 請填入 CTA 文案'); return; }
+  if (!threshold)  { toast('⚠️ 請填入觸發數值'); return; }
+
+  const r = await ag({
+    action:    'saveCTARule',
+    rowIndex:  rowIndex || '',
+    account:   encodeURIComponent(account),
+    topic:     encodeURIComponent(topic),
+    metric:    encodeURIComponent(metric),
+    threshold,
+    region:    encodeURIComponent(region),
+    ctaText:   encodeURIComponent(ctaText),
+    enabled:   enabled ? '1' : '0'
+  });
+  if (r?.success) { toast('✅ 規則已儲存'); closeCTAForm(); loadCTARules(); }
+  else toast('❌ 儲存失敗：' + (r?.message || ''));
 }
 
 async function deleteCTA(rowIndex) {
   if (!confirm('確定要刪除這條規則嗎？')) return;
-  const r = await ap({ action: 'deleteCTARule', rowIndex });
-  if (r?.data?.success) { toast('✅ 已刪除'); loadCTARules(); }
+  const r = await ag({ action: 'deleteCTARule', rowIndex });
+  if (r?.success) { toast('✅ 已刪除'); loadCTARules(); }
   else toast('❌ 刪除失敗');
 }
 
