@@ -1176,8 +1176,35 @@ async function submitSched() {
   }
 }
 
-// Utils
-function fn(n){if(n==null)return'0';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return n.toString();}
+// Schedule List
+async function loadScheduleList() {
+  const el = document.getElementById('sched-list');
+  if (!el) return;
+  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px">載入中...</div>';
+  try {
+    const res = await ag({ action: 'getScheduleList' });
+    const list = res?.items || [];
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">尚無排程</div><div class="empty-desc">從左側新增發文排程</div></div>';
+      return;
+    }
+    el.innerHTML = list.map(item => `
+      <div class="schedule-item">
+        <div class="schedule-item-header">
+          <span class="schedule-item-account" style="color:${item.account==='tkbletsplay_'?'#9A7ED0':item.account==='tkbletsgo.usca'?'#76C8A7':'#FFA534'}">${al(item.account)}</span>
+          <span class="schedule-item-time">${item.schedTime ? new Date(item.schedTime).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}</span>
+        </div>
+        <div class="schedule-item-content">${eh(item.content||'')}</div>
+        <div style="margin-top:4px;display:flex;gap:6px;align-items:center">
+          <span style="font-size:10px;padding:1px 7px;border-radius:99px;background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border)">${item.status||'待發布'}</span>
+          ${item.topic?`<span style="font-size:10px;color:var(--text-muted)">${item.topic}</span>`:''}
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px">載入失敗</div>';
+  }
+}{if(n==null)return'0';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return n.toString();}
 function fd(ts){if(!ts)return'';const d=new Date(ts);if(isNaN(d))return'';return(d.getMonth()+1)+'/'+(d.getDate());}
 function eh(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function al(a){return a==='tkbletsplay_'?'遊學':a==='tkbletsgo.usca'?'美加':'英澳';}
@@ -1629,6 +1656,7 @@ function navTo(pg, el) {
   if (pg === 'posts' && allPosts.length === 0) loadPosts();
   if (pg === 'analytics') loadAnalytics();
   if (pg === 'analytics2') loadAnalytics2();
+  if (pg === 'schedule' && API) loadScheduleList();
   if (pg === 'cta' && API) loadCTARules();
   if (pg === 'posts' && API) loadHeatmap();
 }
