@@ -1220,7 +1220,8 @@ async function submitSched() {
         toast('✅ 貼文已立即發布！');
         document.getElementById('sc').value = '';
       } else {
-        toast('❌ 發布失敗：' + (r?.message || '請確認 API'));
+        toast('❌ 發布失敗：' + (r?.message || 'GAS 無回應，請檢查 F12 Console'));
+        console.error('createPost 失敗，回傳值：', r);
       }
     } else {
       // 新增排程
