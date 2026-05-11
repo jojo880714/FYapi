@@ -1031,22 +1031,49 @@ async function genCopy(){
   }
 
   prompt+=`\n【原始草稿】：\n${inp}\n\n`;
-  prompt+=`請務必輸出 JSON 格式，包含兩個不同切入點的版本和 ${ht?'5-8個':'0個'} Hashtags。格式：{"versions":[{"title":"版本A（切入點）","content":"貼文內容"},{"title":"版本B（切入點）","content":"貼文內容"}],"hashtags":["#tag1"]}`;
+  prompt+=`請產出兩個不同切入點的版本，格式如下（嚴格照這個格式，不要加其他說明）：
+
+===版本A===
+（版本A切入點標題，10字內）
+（版本A完整貼文內容）
+
+===版本B===
+（版本B切入點標題，10字內）
+（版本B完整貼文內容）
+${ht?`\n===HASHTAGS===\n（列出5-8個hashtag，空格分隔）`:''}`
 
   try{
     const gasRes = await ag({ action: 'askGemini', prompt: encodeURIComponent(prompt) });
-    let tx = gasRes?.text || '{}';
-    tx=tx.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    tx=tx.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');
-    let r;
-    try{ r=JSON.parse(tx); }
-    catch(parseErr){
-      // 嘗試找到 JSON 物件
-      const match=tx.match(/\{[\s\S]*\}/);
-      if(match) r=JSON.parse(match[0]);
-      else throw new Error('JSON 解析失敗：'+parseErr.message);
-    }
-    vers=r.versions||[];hts=r.hashtags||[];actVer=0;
+    const tx = (gasRes?.text || '').trim();
+    if (!tx) throw new Error('API 無回應');
+
+    // 解析純文字格式
+    const parseVersions = (raw) => {
+      const result = [];
+      const vAMatch = raw.match(/===版本A===\s*([\s\S]*?)(?===版本B===|===HASHTAGS===|$)/);
+      const vBMatch = raw.match(/===版本B===\s*([\s\S]*?)(?===HASHTAGS===|$)/);
+      if (vAMatch) {
+        const lines = vAMatch[1].trim().split('\n');
+        result.push({ title: lines[0].trim() || '版本A', content: lines.slice(1).join('\n').trim() });
+      }
+      if (vBMatch) {
+        const lines = vBMatch[1].trim().split('\n');
+        result.push({ title: lines[0].trim() || '版本B', content: lines.slice(1).join('\n').trim() });
+      }
+      return result;
+    };
+
+    const parseHashtags = (raw) => {
+      const htMatch = raw.match(/===HASHTAGS===\s*([\s\S]*?)$/);
+      if (!htMatch) return [];
+      return htMatch[1].trim().split(/[\s,，]+/).filter(h => h.startsWith('#'));
+    };
+
+    vers = parseVersions(tx);
+    hts  = ht ? parseHashtags(tx) : [];
+    actVer = 0;
+
+    if (!vers.length) throw new Error('無法解析回應，請重試');
 
     if(vers.length){
       const tabs=document.getElementById('ver-tabs');
@@ -1063,7 +1090,6 @@ async function genCopy(){
       document.getElementById('tone-btn').disabled=false;
       document.getElementById('sfc').classList.add('show');
       toast('✅ 文案生成完成！');
-      // 儲存到歷史紀錄
       saveCopyHistory(inp, vers, hts, platform);
     }
   }catch(e){toast('❌ 生成失敗：'+e.message);}
