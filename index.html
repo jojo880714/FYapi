@@ -993,7 +993,7 @@ function clearCopy(){document.getElementById('copy-input').value='';document.get
 async function genCopy(){
   const inp=document.getElementById('copy-input').value.trim();
   if(!inp){toast('⚠️ 請輸入內容');return;}
-  if(!GEM){toast('⚠️ 請先設定 Gemini API Key');return;}
+  if(!API){toast('⚠️ 請先設定 GAS API URL');return;}
 
   const btn=document.getElementById('copy-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 生成中...';
@@ -1034,19 +1034,9 @@ async function genCopy(){
   prompt+=`請務必輸出 JSON 格式，包含兩個不同切入點的版本和 ${ht?'5-8個':'0個'} Hashtags。格式：{"versions":[{"title":"版本A（切入點）","content":"貼文內容"},{"title":"版本B（切入點）","content":"貼文內容"}],"hashtags":["#tag1"]}`;
 
   try{
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEM}`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        contents:[{parts:[{text:prompt}]}],
-        system_instruction:{parts:[{text:SYSTEM_PROMPT}]},
-        generationConfig:{temperature:.8,maxOutputTokens:2000,responseMimeType:'application/json'}
-      })
-    });
-    const j=await res.json();
-    let tx=j.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+    const gasRes = await ag({ action: 'askGemini', prompt: encodeURIComponent(prompt) });
+    let tx = gasRes?.text || '{}';
     tx=tx.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    // 移除可能的控制字元
     tx=tx.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');
     let r;
     try{ r=JSON.parse(tx); }
@@ -1084,26 +1074,31 @@ function updCC(){const v=vers[actVer]?.content||document.getElementById('copy-ou
 function cpRes(){navigator.clipboard.writeText(document.getElementById('copy-out').value).then(()=>toast('✅ 已複製'));}
 function copyHT(){navigator.clipboard.writeText(hts.join(' ')).then(()=>toast('✅ Hashtags 已複製'));}
 async function chkTone(){
-  if(!GEM||!vers.length)return;
+  if(!vers.length)return;
   const btn=document.getElementById('tone-btn');
   btn.disabled=true;btn.innerHTML='⏳ 檢測中...';
   const content=vers[actVer].content;
   try{
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEM}`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        contents:[{parts:[{text:`請以專業社群編輯的角度，檢測以下文案的「人味指數」（是否像真人寫的，還是有濃厚的 AI 機器人味）。\n請給出 1 到 100 的評分（100 分代表完全像真人，0 分代表非常生硬的 AI 味）。\n並給出簡短的分析（50字內）以及 1-2 個具體的修改建議。\n\n請務必只回傳 JSON 格式：\n{"score":85,"analysis":"語氣自然，但部分轉折詞略顯生硬。","suggestions":["將『總而言之』改為直接刪除","結尾可以多加互動問句"]}\n\n文案內容：\n${content}`}]}],
-        generationConfig:{temperature:.2,maxOutputTokens:200,responseMimeType:'application/json'}
-      })
-    });
-    const j=await res.json();
-    const t=JSON.parse(j.candidates?.[0]?.content?.parts?.[0]?.text||'{}');
+    const tonePrompt=`請以專業社群編輯的角度，檢測以下文案的「人味指數」（是否像真人寫的，還是有濃厚的 AI 機器人味）。
+請給出 1 到 100 的評分（100 分代表完全像真人，0 分代表非常生硬的 AI 味）。
+並給出簡短的分析（50字內）以及 1-2 個具體的修改建議。
+
+請務必只回傳 JSON 格式，不要有任何其他文字：
+{"score":85,"analysis":"語氣自然，但部分轉折詞略顯生硬。","suggestions":["將總而言之改為直接刪除","結尾可以多加互動問句"]}
+
+文案內容：
+${content}`;
+
+    const gasRes = await ag({ action: 'askGemini', prompt: encodeURIComponent(tonePrompt) });
+    let tx = gasRes?.text || '{}';
+    tx = tx.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const match = tx.match(/\{[\s\S]*\}/);
+    const t = match ? JSON.parse(match[0]) : {};
+
     const color=t.score>=80?'var(--green)':t.score>=60?'var(--yellow)':'var(--red)';
     const sugs=(t.suggestions||[]).map(s=>`<li style="margin-top:4px">• ${s}</li>`).join('');
     toast(`人味指數：${t.score}/100 — ${t.analysis}`);
 
-    // 顯示詳細結果在輸出區下方
     let resultEl=document.getElementById('tone-result');
     if(!resultEl){
       resultEl=document.createElement('div');
@@ -1111,7 +1106,7 @@ async function chkTone(){
       resultEl.style.cssText='padding:12px 14px;background:var(--bg-elevated);border-top:1px solid var(--border);font-size:12px;flex-shrink:0;';
       document.getElementById('copy-out').closest('.copy-output-card').insertBefore(resultEl, document.getElementById('ht-area'));
     }
-    resultEl.innerHTML=`<div style="display:flex;align-items:flex-start;gap:10px"><div style="text-align:center;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:64px;flex-shrink:0"><div style="font-size:9px;font-weight:600;color:var(--text-muted);margin-bottom:4px">人味指數</div><div style="font-size:22px;font-weight:900;color:${color};font-family:var(--font-mono)">${t.score}</div><div style="font-size:9px;color:var(--text-muted)">/100</div></div><div style="flex:1"><p style="color:var(--text-primary);line-height:1.5;margin-bottom:6px">💡 ${t.analysis}</p><ul style="color:var(--text-secondary);list-style:none;padding:0">${sugs}</ul></div><button onclick="document.getElementById('tone-result').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:0 4px">×</button></div>`;
+    resultEl.innerHTML=`<div style="display:flex;align-items:flex-start;gap:10px"><div style="text-align:center;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:64px;flex-shrink:0"><div style="font-size:9px;font-weight:600;color:var(--text-muted);margin-bottom:4px">人味指數</div><div style="font-size:22px;font-weight:900;color:${color};font-family:var(--font-mono)">${t.score||'?'}</div><div style="font-size:9px;color:var(--text-muted)">/100</div></div><div style="flex:1"><p style="color:var(--text-primary);line-height:1.5;margin-bottom:6px">💡 ${t.analysis||'無分析'}</p><ul style="color:var(--text-secondary);list-style:none;padding:0">${sugs}</ul></div><button onclick="document.getElementById('tone-result').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:0 4px">×</button></div>`;
   }catch(e){toast('❌ 語氣檢測失敗：'+e.message);}
   btn.disabled=false;btn.innerHTML='📊 語氣檢測';
 }
@@ -1508,10 +1503,12 @@ async function addTemplate() {
   try {
     const templates = getTemplates();
     const cats = [...new Set(templates.map(t=>t.category))].filter(Boolean);
-    const prompt = `請分析以下社群貼文範本，給它一個簡短「標題」（10字內）和「分類」。${cats.length?`請優先從現有分類選擇：[${cats.join(', ')}]，不適合再新建。`:'分類例如：知識乾貨、情境故事、促銷導購、互動問答等。'}只回傳 JSON：{"title":"標題","category":"分類"}\n範本：${txt}`;
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEM}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:.1,maxOutputTokens:100,responseMimeType:'application/json'}})});
-    const j = await res.json();
-    const r = JSON.parse(j.candidates?.[0]?.content?.parts?.[0]?.text||'{}');
+    const prompt = `請分析以下社群貼文範本，給它一個簡短「標題」（10字內）和「分類」。${cats.length?`請優先從現有分類選擇：[${cats.join(', ')}]，不適合再新建。`:'分類例如：知識乾貨、情境故事、促銷導購、互動問答等。'}只回傳 JSON，不要其他文字：{"title":"標題","category":"分類"}\n範本：${txt}`;
+    const gasRes = await ag({ action: 'askGemini', prompt: encodeURIComponent(prompt) });
+    let tx = gasRes?.text || '{}';
+    tx = tx.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const match = tx.match(/\{[\s\S]*\}/);
+    const r = match ? JSON.parse(match[0]) : {};
     const newT = { id: Date.now().toString(), title: r.title||'未命名範本', category: r.category||'自訂', text: txt };
     templates.push(newT);
     saveTemplates(templates);
