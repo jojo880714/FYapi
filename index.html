@@ -574,9 +574,29 @@ body.light-mode .form-input[type="datetime-local"]{color-scheme:light}
       </div>
       <div class="copy-output-card">
         <div class="version-tabs" id="ver-tabs"><div class="version-tab active">小編語氣（去 AI 化）</div></div>
-        <div class="copy-output-area">
+        <div class="copy-output-area" style="position:relative">
           <div class="copy-output-placeholder" id="copy-ph"><div class="placeholder-icon">✍️</div><div>翻譯結果將顯示於此</div><div style="font-size:11px">您可以直接在此微調</div></div>
-          <textarea class="copy-output-textarea" id="copy-out" style="display:none" oninput="updCC()"></textarea>
+          <!-- 可編輯 div 取代 textarea -->
+          <div id="copy-out"
+               contenteditable="true"
+               spellcheck="false"
+               style="display:none;width:100%;min-height:280px;background:transparent;color:var(--text-primary);font-size:13px;padding:14px;outline:none;font-family:var(--font);line-height:1.7;white-space:pre-wrap;word-break:break-all;overflow-y:auto"
+               oninput="updCC()"></div>
+          <!-- 局部改寫浮動選單 -->
+          <div id="rewrite-menu" style="display:none;position:fixed;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.18);padding:10px;z-index:9999;min-width:200px">
+            <div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:8px;padding:0 4px">✨ AI 局部改寫</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">
+              <button class="btn btn-ghost" style="font-size:11px;padding:5px 8px;text-align:left" onclick="rewriteSel('更口語，像真人在說話，減少書面語')">更口語</button>
+              <button class="btn btn-ghost" style="font-size:11px;padding:5px 8px;text-align:left" onclick="rewriteSel('改寫得更專業、有說服力')">更專業</button>
+              <button class="btn btn-ghost" style="font-size:11px;padding:5px 8px;text-align:left" onclick="rewriteSel('大幅縮短，保留核心訊息')">縮短</button>
+              <button class="btn btn-ghost" style="font-size:11px;padding:5px 8px;text-align:left" onclick="rewriteSel('擴寫，加入更多細節與情境')">擴寫</button>
+              <button class="btn btn-ghost" style="font-size:11px;padding:5px 8px;text-align:left;grid-column:1/-1" onclick="rewriteSel('放大讀者的痛點，讓他更有共鳴')">放大痛點</button>
+            </div>
+            <div style="display:flex;gap:4px">
+              <input id="rewrite-custom" type="text" class="form-input" placeholder="自訂修改指令..." style="font-size:11px;padding:5px 8px;flex:1">
+              <button class="btn btn-primary" style="font-size:11px;padding:5px 8px" onclick="rewriteCustom()">✨</button>
+            </div>
+          </div>
         </div>
         <div class="hashtag-area" id="ht-area" style="display:none">
           <div class="hashtag-label"><span># 推薦 Hashtags</span><span style="cursor:pointer;color:var(--accent);font-size:10px" onclick="copyHT()">複製全部</span></div>
@@ -1009,6 +1029,18 @@ async function genCopy(){
 
   const emojiLevel=emojiDensity===1?'極少 (僅在關鍵處點綴)':emojiDensity===2?'適中 (自然融入)':'豐富 (活潑強烈)';
 
+  // 拉取各帳號高瀏覽貼文作為風格參考
+  let refExamples = '';
+  try {
+    const topRes = await ag({ action: 'getTopPostsForCopy' });
+    if (topRes?.posts?.length) {
+      refExamples = '\n\n【品牌爆款貼文參考（請學習這些貼文的語氣、節奏與風格，但不要複製內容）】：\n';
+      topRes.posts.forEach((p, i) => {
+        refExamples += `\n參考${i+1}（${p.account}，瀏覽${p.views}）：\n${p.content.substring(0,200)}\n`;
+      });
+    }
+  } catch(e) { /* 拉不到也不影響生成 */ }
+
   let prompt=`請幫我將以下內容改寫為【${platform}】的貼文。\n`;
   prompt+=`【品牌人設】：${persona||'無特定設定，請以一般客觀專業小編角度撰寫'}\n`;
   prompt+=`【語氣設定】：${tone}\n`;
@@ -1030,7 +1062,7 @@ async function genCopy(){
     if(reply)prompt+=`- 回文：請在主文之後，額外撰寫 1-2 則「小編補充回文」，並清楚標註【回文】。\n`;
   }
 
-  prompt+=`\n【原始草稿】：\n${inp}\n\n`;
+  prompt+=`\n【原始草稿】：\n${inp}${refExamples}\n\n`;
   prompt+=`請產出兩個不同切入點的版本，格式如下（嚴格照這個格式，不要加其他說明）：
 
 ===版本A===
@@ -1079,7 +1111,8 @@ ${ht?`\n===HASHTAGS===\n（列出5-8個hashtag，空格分隔）`:''}`
       const tabs=document.getElementById('ver-tabs');
       tabs.innerHTML=vers.map((v,i)=>`<button class="version-tab ${i===0?'active':''}" onclick="swVer(${i})">${v.title}</button>`).join('');
       const out=document.getElementById('copy-out');
-      out.value=vers[0].content;out.style.display='block';
+      out.innerText=vers[0].content;
+      out.style.display='block';
       document.getElementById('copy-ph').style.display='none';
       updCC();
       if(hts.length){
@@ -1095,15 +1128,114 @@ ${ht?`\n===HASHTAGS===\n（列出5-8個hashtag，空格分隔）`:''}`
   }catch(e){toast('❌ 生成失敗：'+e.message);}
   btn.disabled=false;btn.innerHTML='✨ 執行去 AI 化（產出雙版本）';
 }
-function swVer(i){actVer=i;document.querySelectorAll('.version-tab').forEach((t,j)=>t.classList.toggle('active',i===j));document.getElementById('copy-out').value=vers[i].content;updCC();}
-function updCC(){const v=vers[actVer]?.content||document.getElementById('copy-out').value;document.getElementById('cc').textContent='字數：'+v.length+' 字';}
-function cpRes(){navigator.clipboard.writeText(document.getElementById('copy-out').value).then(()=>toast('✅ 已複製'));}
+function swVer(i){
+  actVer=i;
+  document.querySelectorAll('.version-tab').forEach((t,j)=>t.classList.toggle('active',i===j));
+  const out=document.getElementById('copy-out');
+  out.innerText=vers[i].content;
+  updCC();
+}
+function updCC(){
+  const out=document.getElementById('copy-out');
+  const v=out.innerText||'';
+  document.getElementById('cc').textContent='字數：'+v.length+' 字';
+}
+function cpRes(){
+  const out=document.getElementById('copy-out');
+  navigator.clipboard.writeText(out.innerText||'').then(()=>toast('✅ 已複製'));
+}
 function copyHT(){navigator.clipboard.writeText(hts.join(' ')).then(()=>toast('✅ Hashtags 已複製'));}
+
+// ── 局部改寫 ──
+let _savedRange = null;
+
+document.addEventListener('mouseup', (e) => {
+  const out = document.getElementById('copy-out');
+  const menu = document.getElementById('rewrite-menu');
+  if (!out || out.style.display === 'none') return;
+  if (menu && menu.contains(e.target)) return;
+
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !out.contains(sel.anchorNode)) {
+    if (menu && !menu.contains(e.target)) {
+      menu.style.display = 'none';
+      _savedRange = null;
+    }
+    return;
+  }
+
+  const selectedText = sel.toString().trim();
+  if (!selectedText) return;
+
+  _savedRange = sel.getRangeAt(0).cloneRange();
+
+  const rect = sel.getRangeAt(0).getBoundingClientRect();
+  menu.style.display = 'block';
+  menu.style.left = Math.min(rect.left, window.innerWidth - 220) + 'px';
+  menu.style.top  = (rect.bottom + window.scrollY + 8) + 'px';
+});
+
+document.addEventListener('mousedown', (e) => {
+  const menu = document.getElementById('rewrite-menu');
+  if (menu && !menu.contains(e.target)) {
+    menu.style.display = 'none';
+  }
+});
+
+function getSelectedText() {
+  if (_savedRange) return _savedRange.toString().trim();
+  return '';
+}
+
+async function rewriteSel(instruction) {
+  const selected = getSelectedText();
+  if (!selected) return;
+  document.getElementById('rewrite-menu').style.display = 'none';
+  await doRewrite(selected, instruction);
+}
+
+async function rewriteCustom() {
+  const selected = getSelectedText();
+  const instruction = document.getElementById('rewrite-custom').value.trim();
+  if (!selected || !instruction) { toast('⚠️ 請先選取文字並輸入指令'); return; }
+  document.getElementById('rewrite-menu').style.display = 'none';
+  await doRewrite(selected, instruction);
+}
+
+async function doRewrite(text, instruction) {
+  if (!API) { toast('⚠️ 請先設定 GAS API URL'); return; }
+  toast('⏳ 改寫中...');
+  const prompt = `請依照以下指令改寫這段文字，只回傳改寫後的文字，不要加任何說明：
+指令：${instruction}
+原文：${text}`;
+  try {
+    const res = await ag({ action: 'askGemini', prompt: encodeURIComponent(prompt) });
+    const newText = res?.text?.trim() || '';
+    if (!newText) throw new Error('無回應');
+
+    // 把選取範圍換成新文字
+    if (_savedRange) {
+      const out = document.getElementById('copy-out');
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(_savedRange);
+      document.execCommand('insertText', false, newText);
+      _savedRange = null;
+      // 同步回 vers 陣列
+      vers[actVer] = { ...vers[actVer], content: out.innerText };
+      updCC();
+    }
+    toast('✅ 改寫完成');
+  } catch (e) {
+    toast('❌ 改寫失敗：' + e.message);
+  }
+}
 async function chkTone(){
   if(!vers.length)return;
   const btn=document.getElementById('tone-btn');
   btn.disabled=true;btn.innerHTML='⏳ 檢測中...';
-  const content=vers[actVer].content;
+  const out=document.getElementById('copy-out');
+  const content=out.innerText||vers[actVer]?.content||'';
   try{
     const tonePrompt=`請以專業社群編輯的角度，檢測以下文案的「人味指數」（是否像真人寫的，還是有濃厚的 AI 機器人味）。
 請給出 1 到 100 的評分（100 分代表完全像真人，0 分代表非常生硬的 AI 味）。
@@ -1136,7 +1268,15 @@ ${content}`;
   }catch(e){toast('❌ 語氣檢測失敗：'+e.message);}
   btn.disabled=false;btn.innerHTML='📊 語氣檢測';
 }
-function toSched(){const c=vers[actVer]?.content;if(!c)return;document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-schedule').classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.page==='schedule'));setTimeout(()=>{document.getElementById('sc').value=c;toast('✅ 文案已帶入排程表單');},100);}
+function toSched(){
+  const out=document.getElementById('copy-out');
+  const c=out.innerText||vers[actVer]?.content;
+  if(!c)return;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-schedule').classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.page==='schedule'));
+  setTimeout(()=>{document.getElementById('sc').value=c;toast('✅ 文案已帶入排程表單');},100);
+}
 
 async function submitSched() {
   const account    = document.getElementById('sa').value;
@@ -1616,7 +1756,7 @@ function renderHistory() {
     <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">${new Date(h.timestamp).toLocaleString()}</span>
+          <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">${h.timestamp ? (d=new Date(h.timestamp), isNaN(d)?'':d.toLocaleString()) : ''}</span>
           <span style="font-size:10px;padding:1px 6px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-weight:600">${h.platform||'Threads'}</span>
         </div>
         <div style="font-size:12px;color:var(--text-primary);font-weight:500;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">草稿：${eh(h.input)}</div>
