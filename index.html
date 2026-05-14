@@ -775,6 +775,75 @@ function initCharts(){
 }
 
 // API
+// ══════════════════════════════════════════════════════════════
+// localStorage 快取管理器
+// ══════════════════════════════════════════════════════════════
+const CACHE_TTL = {
+  getStats:        5  * 60 * 1000,  // 5 分鐘
+  getDashboardData:10 * 60 * 1000,  // 10 分鐘
+  getFollowersData: 6 * 60 * 60 * 1000, // 6 小時
+  getFilterOptions: 60 * 60 * 1000, // 1 小時
+  getTopicDist:    10 * 60 * 1000,
+  getTrend:        10 * 60 * 1000,
+  getTop3:         10 * 60 * 1000,
+  getTopicAvgViews:10 * 60 * 1000,
+  getMonthlyTrend: 10 * 60 * 1000,
+  getHeatmapData:  10 * 60 * 1000,
+};
+
+function cacheKey(params) {
+  return 'gas_cache_' + JSON.stringify(params);
+}
+
+function cacheGet(params) {
+  const action = params.action;
+  if (!CACHE_TTL[action]) return null;
+  try {
+    const raw = localStorage.getItem(cacheKey(params));
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL[action]) return null;
+    return data;
+  } catch(e) { return null; }
+}
+
+function cacheSet(params, data) {
+  const action = params.action;
+  if (!CACHE_TTL[action]) return;
+  try {
+    localStorage.setItem(cacheKey(params), JSON.stringify({ data, ts: Date.now() }));
+  } catch(e) { /* localStorage 滿了就跳過 */ }
+}
+
+function cacheClear(actionPrefix) {
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('gas_cache_') && (!actionPrefix || k.includes(actionPrefix)))
+      .forEach(k => localStorage.removeItem(k));
+  } catch(e) {}
+}
+
+// 包裝 ag()：先查快取，有就回傳，背景更新；沒有才等 API
+async function agc(p) {
+  const cached = cacheGet(p);
+  if (cached) {
+    // 有快取：立刻回傳，背景悄悄更新並重新 render
+    ag(p).then(fresh => {
+      if (fresh) {
+        cacheSet(p, fresh);
+        // 背景拿到新資料後，對應頁面元素重新更新
+        if (p.action === 'getFollowersData') updFW(fresh);
+        if (p.action === 'getStats') updStats(fresh);
+      }
+    }).catch(()=>{});
+    return cached;
+  }
+  // 沒有快取：正常打 API，存快取
+  const result = await ag(p);
+  if (result) cacheSet(p, result);
+  return result;
+}
+
 async function ag(p){if(!API){toast('⚠️ 請先設定 GAS API URL');return null;}const u=new URL(API);Object.entries(p).forEach(([k,v])=>u.searchParams.set(k,v));try{const r=await fetch(u.toString());const j=await r.json();if(j.success===false)throw new Error(j.message);return j.data!==undefined?j.data:j;}catch(e){toast('❌ '+e.message);return null;}}
 async function ap(b){if(!API){toast('⚠️ 請先設定 GAS API URL');return null;}try{const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return await r.json();}catch(e){toast('❌ '+e.message);return null;}}
 async function execAction(n){toast('⏳ 執行中：'+n);const r=await ag({action:'executeAction',name:n});if(r){toast('✅ 完成：'+n);}return r;}
@@ -786,14 +855,18 @@ async function testApi(){const el=document.getElementById('api-test-result');el.
 
 // Dashboard
 async function loadDash(){
-  const[s,tr,tp,t3,fw]=await Promise.all([ag({action:'getStats'}),ag({action:'getTrend',days:30}),ag({action:'getTopicDist'}),ag({action:'getTop3',metric:'views'}),ag({action:'getFollowersData'})]);
+  const[s,tr,tp,t3,fw]=await Promise.all([agc({action:'getStats'}),agc({action:'getTrend',days:30}),agc({action:'getTopicDist'}),agc({action:'getTop3',metric:'views'}),agc({action:'getFollowersData'})]);
   if(s)updStats(s);if(tr)updTrend(tr);if(tp)updTopic(tp);if(t3)updTop3(t3);if(fw)updFW(fw);
 }
 function setAccountFilter(a,el){accFilter=a;document.querySelectorAll('.account-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');reloadDash();}
-async function reloadDash(){const p=accFilter!=='all'?{account:accFilter}:{};const[tr,tp,t3]=await Promise.all([ag({action:'getTrend',days:30,...p}),ag({action:'getTopicDist',...p}),ag({action:'getTop3',metric:'views',...p})]);if(tr)updTrend(tr);if(tp)updTopic(tp);if(t3)updTop3(t3);}
-async function syncData(){document.getElementById('sync-spinner').style.display='inline-block';document.getElementById('sync-text').textContent='同步中...';await execAction('collectMetricsAndCheckCTA');await loadDash();document.getElementById('sync-spinner').style.display='none';document.getElementById('sync-text').textContent='⟳ 一鍵同步';}
+async function reloadDash(){const p=accFilter!=='all'?{account:accFilter}:{};const[tr,tp,t3]=await Promise.all([agc({action:'getTrend',days:30,...p}),agc({action:'getTopicDist',...p}),agc({action:'getTop3',metric:'views',...p})]);if(tr)updTrend(tr);if(tp)updTopic(tp);if(t3)updTop3(t3);}
+async function syncData(){document.getElementById('sync-spinner').style.display='inline-block';document.getElementById('sync-text').textContent='同步中...';cacheClear();await execAction('collectMetricsAndCheckCTA');await loadDash();document.getElementById('sync-spinner').style.display='none';document.getElementById('sync-text').textContent='⟳ 一鍵同步';}
 function updStats(s){document.getElementById('stat-posts').textContent=fn(s.totalPosts);document.getElementById('stat-views').textContent=fn(s.totalViews);document.getElementById('stat-likes').textContent=fn(s.totalLikes);document.getElementById('stat-replies').textContent=fn(s.totalReplies);document.getElementById('stat-posts-badge').textContent='共 '+s.totalPosts+' 篇';document.getElementById('stat-views-badge').textContent='均 '+fn(s.avgViews)+'/篇';}
-function updFW(d){[['遊學','follower-play','follower-play-change'],['美加','follower-usca','follower-usca-change'],['英澳','follower-ukau','follower-ukau-change']].forEach(([k,el,cel])=>{const arr=d[k]||[];if(!arr.length){document.getElementById(el).textContent='—';return;}const lat=arr[arr.length-1].followers;document.getElementById(el).textContent=fn(lat);if(arr.length>=2){const prev=arr[arr.length-2].followers,diff=lat-prev;const ce=document.getElementById(cel);ce.textContent=(diff>=0?'▲ +':'▼ ')+fn(Math.abs(diff))+' 本月';ce.className='follower-change '+(diff>=0?'up':'down');}else{document.getElementById(cel).textContent='本月首筆';}});
+function updFW(d){
+  // 如果三個帳號全部沒資料，清掉快取強制下次重拉
+  const allEmpty = ['遊學','美加','英澳'].every(k => !(d[k]||[]).length);
+  if (allEmpty) { cacheClear('getFollowersData'); return; }
+  [['遊學','follower-play','follower-play-change'],['美加','follower-usca','follower-usca-change'],['英澳','follower-ukau','follower-ukau-change']].forEach(([k,el,cel])=>{const arr=d[k]||[];if(!arr.length){document.getElementById(el).textContent='—';document.getElementById(cel).textContent='無資料';return;}const lat=arr[arr.length-1].followers;document.getElementById(el).textContent=fn(lat);if(arr.length>=2){const prev=arr[arr.length-2].followers,diff=lat-prev;const ce=document.getElementById(cel);ce.textContent=(diff>=0?'▲ +':'▼ ')+fn(Math.abs(diff))+' 本月';ce.className='follower-change '+(diff>=0?'up':'down');}else{document.getElementById(cel).textContent='本月首筆';}});
   const months=[...new Set([...(d['遊學']||[]).map(x=>x.month),...(d['美加']||[]).map(x=>x.month),...(d['英澳']||[]).map(x=>x.month)])].sort((a,b)=>a-b).map(m=>m+'月');
   if(charts.fw)charts.fw.destroy();const ctx=document.getElementById('followersChart').getContext('2d');
   charts.fw=new Chart(ctx,{type:'line',data:{labels:months,datasets:[{label:'遊學',data:(d['遊學']||[]).map(x=>x.followers),borderColor:'#9A7ED0',tension:.4,fill:false,pointRadius:3},{label:'美加',data:(d['美加']||[]).map(x=>x.followers),borderColor:'#76C8A7',tension:.4,fill:false,pointRadius:3},{label:'英澳',data:(d['英澳']||[]).map(x=>x.followers),borderColor:'#FFA534',tension:.4,fill:false,pointRadius:3}]},options:co('line')});
@@ -815,7 +888,7 @@ function updTrend(d){charts.trend.data.labels=d.dates.map(x=>x.slice(5));charts.
 function updTopic(d){charts.topic.data.labels=d.labels;charts.topic.data.datasets[0].data=d.data;charts.topic.data.datasets[0].backgroundColor=d.colors;charts.topic.update();}
 
 // Posts
-async function loadFOpts(){const o=await ag({action:'getFilterOptions'});if(!o)return;const s=document.getElementById('pf-topic');s.innerHTML='<option value="">全部主題</option>';(o.topics||[]).forEach(t=>{const op=document.createElement('option');op.value=t;op.textContent=t;s.appendChild(op);});}
+async function loadFOpts(){const o=await agc({action:'getFilterOptions'});if(!o)return;const s=document.getElementById('pf-topic');s.innerHTML='<option value="">全部主題</option>';(o.topics||[]).forEach(t=>{const op=document.createElement('option');op.value=t;op.textContent=t;s.appendChild(op);});}
 function debounce(fn,ms){clearTimeout(dTimer);dTimer=setTimeout(fn,ms);}
 async function loadPosts(){
   const body=document.getElementById('post-body');body.innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-title">載入中...</div></div>';
@@ -864,12 +937,12 @@ async function loadPosts(){
     </div>`;}).join('');}
 
 // Analytics
-async function loadAnalytics(){if(!API)return;const d=await ag({action:'getDashboardData'});if(!d||!d.posts)return;aiPosts=d.posts;const tm={};d.posts.forEach(p=>{const t=p.topic||'未分類';if(!tm[t])tm[t]={total:0,count:0};tm[t].total+=p.views;tm[t].count++;});const sorted=Object.entries(tm).sort((a,b)=>b[1].total/b[1].count-a[1].total/a[1].count);charts.tbar.data.labels=sorted.map(e=>e[0]);charts.tbar.data.datasets[0].data=sorted.map(e=>Math.round(e[1].total/e[1].count));charts.tbar.update();
+async function loadAnalytics(){if(!API)return;const d=await agc({action:'getDashboardData'});if(!d||!d.posts)return;aiPosts=d.posts;const tm={};d.posts.forEach(p=>{const t=p.topic||'未分類';if(!tm[t])tm[t]={total:0,count:0};tm[t].total+=p.views;tm[t].count++;});const sorted=Object.entries(tm).sort((a,b)=>b[1].total/b[1].count-a[1].total/a[1].count);charts.tbar.data.labels=sorted.map(e=>e[0]);charts.tbar.data.datasets[0].data=sorted.map(e=>Math.round(e[1].total/e[1].count));charts.tbar.update();
   const mm={};['遊學','美加','英澳'].forEach(g=>{mm[g]={};});d.posts.forEach(p=>{const mo=new Date(p.timestamp).getMonth()+1;const g=p.account==='tkbletsplay_'?'遊學':p.account==='tkbletsgo.usca'?'美加':'英澳';if(!mm[g][mo])mm[g][mo]=0;mm[g][mo]++;});const mos=Array.from({length:12},(_,i)=>i+1);const cls={'遊學':'#9A7ED0','美加':'#76C8A7','英澳':'#FFA534'};charts.monthly.data.labels=mos.map(m=>m+'月');charts.monthly.data.datasets=Object.entries(mm).map(([g,data])=>({label:g,data:mos.map(m=>data[m]||0),borderColor:cls[g],backgroundColor:'transparent',tension:.4,pointRadius:3}));charts.monthly.update();
   loadHeatmap();}
 
 // AI Chat
-async function ensureCtx(){if(!aiStats)aiStats=await ag({action:'getStats'});if(!aiPosts){const d=await ag({action:'getDashboardData'});aiPosts=d?d.posts:[];}}
+async function ensureCtx(){if(!aiStats)aiStats=await agc({action:'getStats'});if(!aiPosts){const d=await agc({action:'getDashboardData'});aiPosts=d?d.posts:[];}}
 async function askAI(q){document.getElementById('ai-input').value=q;await sendAI();}
 async function sendAI(){
   const inp=document.getElementById('ai-input');
@@ -1285,7 +1358,8 @@ async function loadScheduleList() {
     el.innerHTML = list.map(item => {
       const isPending = item.status === '待發布';
       const acColor = item.account==='tkbletsplay_'?'#9A7ED0':item.account==='tkbletsgo.usca'?'#76C8A7':'#FFA534';
-      const timeStr = item.schedTime ? new Date(item.schedTime).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+      const _d = item.schedTime ? new Date(item.schedTime) : null;
+      const timeStr = _d && !isNaN(_d) ? _d.toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
       return `
       <div class="schedule-item">
         <div class="schedule-item-header">
@@ -1512,7 +1586,7 @@ async function saveCTARule() {
     enabled:   enabled ? '1' : '0'
   });
   if (r?.success) { toast('✅ 規則已儲存'); closeCTAForm(); loadCTARules(); }
-  else toast('❌ 儲存失敗：' + (r?.message || ''));
+  else { console.error('saveCTARule 回傳：', r); toast('❌ 儲存失敗：' + (r?.message || r?.error || 'GAS 無回應，請看 Console')); }
 }
 
 async function deleteCTA(rowIndex) {
@@ -1857,7 +1931,7 @@ async function loadAnalytics2() {
   // 一次 API 拿所有貼文
   const params = { action: 'getDashboardData' };
   if (a2CurrentAccount) params.account = a2CurrentAccount;
-  const res = await ag(params);
+  const res = await agc(params);
   if (!res || !res.posts) {
     if (mLoading) mLoading.textContent = '載入失敗，請確認 API 連線';
     return;
@@ -2075,7 +2149,7 @@ async function loadMonthlyTrend() {
   try {
     const params = { action: 'getMonthlyTrend' };
     if (a2CurrentAccount) params.account = a2CurrentAccount;
-    const res = await ag(params);
+    const res = await agc(params);
     if (!res) return;
 
     const { months, postCounts, totalViews } = res;
