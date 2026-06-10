@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TKB Threads 監控中心</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -238,6 +239,7 @@ body.light-mode .form-input[type="datetime-local"]{color-scheme:light}
     <div class="nav-item" data-page="posts" onclick="navTo('posts',this)"><span class="nav-icon">📋</span><span>貼文管理</span></div>
     <div class="nav-item" data-page="analytics" onclick="navTo('analytics',this)"><span class="nav-icon">🤖</span><span>AI 數據分析</span></div>
     <div class="nav-item" data-page="analytics2" onclick="navTo('analytics2',this)"><span class="nav-icon">📊</span><span>數據洞察</span></div>
+    <div class="nav-item" data-page="report" onclick="navTo('report',this)"><span class="nav-icon">📰</span><span>週報</span></div>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-section-label">內容操作</div>
@@ -512,6 +514,37 @@ body.light-mode .form-input[type="datetime-local"]{color-scheme:light}
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- WEEKLY REPORT -->
+<div class="page" id="page-report">
+  <div class="page-header">
+    <div class="page-header-inner">
+      <div><div class="page-title">週報</div><div class="page-subtitle">3 帳號數據對比 · 可下載 PNG 分享</div></div>
+      <div class="header-actions">
+        <button class="btn btn-ghost" id="report-prev" onclick="loadWeeklyReport(report_offset-1)">← 上一週</button>
+        <button class="btn btn-ghost" id="report-this" onclick="loadWeeklyReport(0)">本週</button>
+        <button class="btn btn-ghost" id="report-next" onclick="loadWeeklyReport(report_offset+1)">下一週 →</button>
+        <button class="btn btn-primary" onclick="downloadReportPNG()">📥 下載 PNG</button>
+      </div>
+    </div>
+  </div>
+  <div class="page-content">
+    <div id="report-export-area" style="background:var(--bg-base);padding:24px;border-radius:14px">
+      <div style="text-align:center;margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--text-muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px">TKB Threads · Weekly Report</div>
+        <div id="report-week-label" style="font-size:24px;font-weight:700;color:var(--text-primary);letter-spacing:-.02em">載入中...</div>
+        <div id="report-week-sub" style="font-size:12px;color:var(--text-muted);margin-top:4px">對比上週: -</div>
+      </div>
+      <div class="section-title">📊 帳號表現對比</div>
+      <div id="report-accounts" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px"></div>
+      <div class="section-title">🏆 本週 Top 3 高互動貼文</div>
+      <div id="report-top3" class="top3-grid" style="margin-bottom:18px"></div>
+      <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+        生成時間: <span id="report-generated-at">-</span> · 互動定義: 愛心 + 留言 + 轉發 + 轉傳
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1890,6 +1923,102 @@ function navTo(pg, el) {
   if (pg === 'schedule' && API) loadScheduleList();
   if (pg === 'cta' && API) loadCTARules();
   if (pg === 'posts' && API) loadHeatmap();
+  if (pg === 'report' && API) loadWeeklyReport(report_offset);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 週報(v16 新增)
+// ══════════════════════════════════════════════════════════════
+
+let report_offset = 0;
+
+async function loadWeeklyReport(weekOffset) {
+  if (!API) { toast('⚠️ 請先設定 GAS API URL'); return; }
+  report_offset = parseInt(weekOffset) || 0;
+  if (report_offset > 0) report_offset = 0;
+
+  document.getElementById('report-week-label').textContent = '載入中...';
+  document.getElementById('report-week-sub').textContent   = '對比上週: -';
+  document.getElementById('report-accounts').innerHTML     = '<div style="grid-column:span 3;text-align:center;padding:24px;color:var(--text-muted)">載入中...</div>';
+  document.getElementById('report-top3').innerHTML         = '<div style="grid-column:span 3;text-align:center;padding:24px;color:var(--text-muted)">載入中...</div>';
+
+  const data = await ag({ action: 'getWeeklyReport', weekOffset: report_offset });
+  if (!data) {
+    document.getElementById('report-week-label').textContent = '載入失敗';
+    return;
+  }
+  renderWeeklyReport(data);
+}
+
+function renderWeeklyReport(data) {
+  document.getElementById('report-week-label').textContent = data.week.label;
+  document.getElementById('report-week-sub').textContent   = '對比上週: ' + data.prevWeek.label;
+  document.getElementById('report-generated-at').textContent =
+    new Date(data.generatedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+
+  const ACCENT = {
+    '遊學': { color: 'var(--purple)', emoji: '🎓' },
+    '美加': { color: 'var(--green)',  emoji: '🇺🇸' },
+    '英澳': { color: 'var(--yellow)', emoji: '🇬🇧' }
+  };
+
+  const accHtml = data.accounts.map(a => {
+    const style = ACCENT[a.label] || { color: 'var(--accent)', emoji: '📡' };
+    const blocks = [
+      { label: '追蹤數',     ...a.followers   },
+      { label: '本週新增貼文', ...a.newPosts    },
+      { label: '本週總互動',   ...a.engagements }
+    ].map(b => {
+      const deltaCls   = b.delta > 0 ? 'up' : (b.delta < 0 ? 'down' : 'neutral');
+      const deltaIcon  = b.delta > 0 ? '↑'   : (b.delta < 0 ? '↓'   : '–');
+      const deltaAbs   = Math.abs(b.delta);
+      const deltaTxt   = b.delta === 0 ? '持平' : (deltaIcon + ' ' + (b.delta > 0 ? '+' : '-') + deltaAbs);
+      return '<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">' + b.label + '</div><div style="font-size:22px;font-weight:700;font-family:var(--font-mono);color:var(--text-primary);letter-spacing:-.02em">' + (b.current||0).toLocaleString() + '</div><span class="stat-badge ' + deltaCls + '" style="margin-top:4px;display:inline-block">' + deltaTxt + '</span></div>';
+    }).join('');
+    return '<div class="follower-card" style="border-left:3px solid ' + style.color + '"><div style="font-size:13px;font-weight:700;color:' + style.color + ';margin-bottom:14px">' + style.emoji + ' ' + a.label + '</div>' + blocks + '</div>';
+  }).join('');
+  document.getElementById('report-accounts').innerHTML = accHtml;
+
+  if (!data.top3Posts.length) {
+    document.getElementById('report-top3').innerHTML =
+      '<div style="grid-column:span 3;text-align:center;padding:32px;color:var(--text-muted)">本週沒有貼文</div>';
+  } else {
+    const top3Html = data.top3Posts.map((p, i) => {
+      const tBadge = p.label === '遊學' ? 'badge-play' : (p.label === '美加' ? 'badge-usca' : 'badge-ukau');
+      return '<div class="top3-card"><div class="top3-rank">#' + (i+1) + '</div><div class="top3-views">' + (p.engagement||0).toLocaleString() + '</div><div style="font-size:10px;color:var(--text-muted);margin-bottom:8px">互動數</div><div class="top3-content">' + escapeReportHTML(p.content) + '</div><div class="top3-footer"><span class="post-account-badge ' + tBadge + '">' + p.label + '</span><span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">❤️ ' + (p.likes||0) + ' · 💬 ' + (p.replies||0) + ' · 🔁 ' + ((p.reposts||0) + (p.quotes||0)) + '</span></div></div>';
+    }).join('');
+    document.getElementById('report-top3').innerHTML = top3Html;
+  }
+}
+
+function escapeReportHTML(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
+async function downloadReportPNG() {
+  const area = document.getElementById('report-export-area');
+  if (!area) return;
+  if (typeof html2canvas === 'undefined') { toast('❌ html2canvas 未載入'); return; }
+  toast('⏳ 生成圖片中...');
+  const bgColor = getComputedStyle(document.body).getPropertyValue('--bg-base').trim() || '#1C1C1E';
+  try {
+    const canvas = await html2canvas(area, { backgroundColor: bgColor, scale: 2, useCORS: true, logging: false });
+    canvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const weekLabel = (document.getElementById('report-week-label').textContent || 'unknown').replace(/[\s\/]/g, '_').replace(/~/g, 'to');
+      a.href = url;
+      a.download = '週報_' + weekLabel + '.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast('✅ 已下載');
+    }, 'image/png');
+  } catch (e) {
+    console.error(e);
+    toast('❌ 截圖失敗: ' + e.message);
+  }
 }
 
 let _tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),3500);}
